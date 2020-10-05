@@ -38,4 +38,7 @@ creditorAddress:
     country: Ukraine
   }
 remittanceInformationUnstructured: remittance
-paymentProduct: SEPA
+paymentProduct: sepa-credit-transfers
+transactionStatus: RCVD
+bankTransactionCode: PMNT-ICDT-STDO
+proprietaryBankTransactionCode: PMNT-ICDT-STDO

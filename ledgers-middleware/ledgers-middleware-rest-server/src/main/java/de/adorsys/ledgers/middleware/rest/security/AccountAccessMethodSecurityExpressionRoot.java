@@ -1,5 +1,6 @@
 package de.adorsys.ledgers.middleware.rest.security;
 
+import de.adorsys.ledgers.middleware.api.domain.account.AccountIdentifierTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.um.*;
 import de.adorsys.ledgers.middleware.api.service.MiddlewareAccountManagementService;
 import de.adorsys.ledgers.middleware.api.service.MiddlewarePaymentService;
@@ -9,7 +10,8 @@ import org.springframework.security.core.Authentication;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
+
+import static de.adorsys.ledgers.middleware.api.domain.um.UserRoleTO.*;
 
 public class AccountAccessMethodSecurityExpressionRoot extends SecurityExpressionAdapter {
 
@@ -17,15 +19,10 @@ public class AccountAccessMethodSecurityExpressionRoot extends SecurityExpressio
         super(authentication, accountService, paymentService);
     }
 
-    public boolean paymentInit(Object payment) {
-        // Either the payment is directly available or wrapped
-        Map<String, ?> map = (Map<String, ?>) payment;
-        if (map.size() == 1) {
-            map = (Map<String, ?>) map.values().iterator().next();
-        }
-        Map<String, ?> debtorAccount = (Map<String, ?>) map.get("debtorAccount");
-        String iban = (String) debtorAccount.get("iban");
-        return checkPaymentInitAccess(iban);
+    public boolean accountInfoByIdentifier(AccountIdentifierTypeTO type, String accountIdentifier) {
+        return type == AccountIdentifierTypeTO.IBAN
+                       ? accountInfoByIban(accountIdentifier)
+                       : accountInfoById(accountIdentifier);
     }
 
     public boolean accountInfoById(String id) {
@@ -50,6 +47,10 @@ public class AccountAccessMethodSecurityExpressionRoot extends SecurityExpressio
         return checkTokenUsage(usageType);
     }
 
+    public boolean tokenUsages(String usageTypeFirst, String usageTypeSecond) {
+        return checkTokenUsage(usageTypeFirst) || checkTokenUsage(usageTypeSecond);
+    }
+
     public boolean loginToken(String scaId, String authorizationId) {
         AccessTokenTO token = getAccessTokenTO();
         return checkTokenUsage(TokenUsageTO.LOGIN.name())
@@ -72,11 +73,11 @@ public class AccountAccessMethodSecurityExpressionRoot extends SecurityExpressio
     private boolean checkPaymentInitAccess(String iban) {
         AccessTokenTO token = getAccessTokenTO();
         // Customer must have explicit permission
-        if (UserRoleTO.CUSTOMER == token.getRole()) {
+        if (EnumSet.of(CUSTOMER, STAFF).contains(token.getRole())) {
             return getAccountAccesses(token.getSub()).stream()
                            .anyMatch(a -> a.hasPaymentAccess(iban));
         }
-        return UserRoleTO.STAFF == token.getRole();
+        return SYSTEM == token.getRole();
     }
 
     private List<AccountAccessTO> getAccountAccesses(String userId) {
@@ -89,12 +90,12 @@ public class AccountAccessMethodSecurityExpressionRoot extends SecurityExpressio
         }
         AccessTokenTO token = getAccessTokenTO();
 
-        // Staff always have account access
-        if (EnumSet.of(UserRoleTO.STAFF, UserRoleTO.SYSTEM).contains(token.getRole())) {
+        // System always have account access
+        if (SYSTEM == token.getRole()) {
             return true;
         }
-        // Customer must have explicit permission
-        if (UserRoleTO.CUSTOMER == token.getRole()) {
+        // Customer and Staff must have explicit permission
+        if (EnumSet.of(CUSTOMER, STAFF).contains(token.getRole())) {
             return getAccountAccesses(token.getSub()).stream()
                            .anyMatch(a -> a.hasIban(iban))
                            || checkConsentAccess(token, iban);

@@ -4,9 +4,11 @@ import de.adorsys.ledgers.middleware.api.domain.um.AccessTokenTO;
 import de.adorsys.ledgers.middleware.rest.security.JWTAuthenticationFilter;
 import de.adorsys.ledgers.middleware.rest.security.MiddlewareAuthentication;
 import de.adorsys.ledgers.middleware.rest.security.TokenAuthenticationService;
+import de.adorsys.ledgers.um.api.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
@@ -24,13 +26,14 @@ import static de.adorsys.ledgers.app.server.auth.PermittedResources.*;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    private final Environment environment;
     private final TokenAuthenticationService tokenAuthenticationService;
+    private final UserService userService;
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                .authorizeRequests().antMatchers(
-                APP_WHITELIST).permitAll()
+                .authorizeRequests().antMatchers(APP_WHITELIST).permitAll()
                 .and()
                 .authorizeRequests().antMatchers(INDEX_WHITELIST).permitAll()
                 .and()
@@ -38,11 +41,14 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .and()
                 .authorizeRequests().antMatchers(CONSOLE_WHITELIST).permitAll()
                 .and()
+                .authorizeRequests().antMatchers(ACTUATOR_WHITELIST).permitAll()
+                .and()
                 .cors()
                 .and()
                 .authorizeRequests().anyRequest().authenticated();
         http.csrf().disable().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
         http.headers().frameOptions().disable();
+        http.addFilterBefore(new DisableEndpointFilter(environment), BasicAuthenticationFilter.class);
         http.addFilterBefore(new JWTAuthenticationFilter(tokenAuthenticationService), BasicAuthenticationFilter.class);
     }
 

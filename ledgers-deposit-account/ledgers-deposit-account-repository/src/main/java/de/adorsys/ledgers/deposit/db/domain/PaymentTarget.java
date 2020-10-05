@@ -32,21 +32,17 @@ public class PaymentTarget {
     private String endToEndIdentification;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "amount", column = @Column(name = "AMT")),
-            @AttributeOverride(name = "currency", column = @Column(name = "CUR"))
-    })
+    @AttributeOverride(name = "amount", column = @Column(name = "AMT"))
+    @AttributeOverride(name = "currency", column = @Column(name = "CUR"))
     @Column(nullable = false)
     private Amount instructedAmount;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "iban", column = @Column(name = "CRED_IBAN")),
-            @AttributeOverride(name = "bban", column = @Column(name = "CRED_BBAN")),
-            @AttributeOverride(name = "pan", column = @Column(name = "CRED_PAN")),
-            @AttributeOverride(name = "maskedPan", column = @Column(name = "CRED_MASKED_PAN")),
-            @AttributeOverride(name = "msisdn", column = @Column(name = "CRED_MSISDN"))
-    })
+    @AttributeOverride(name = "iban", column = @Column(name = "CRED_IBAN"))
+    @AttributeOverride(name = "bban", column = @Column(name = "CRED_BBAN"))
+    @AttributeOverride(name = "pan", column = @Column(name = "CRED_PAN"))
+    @AttributeOverride(name = "maskedPan", column = @Column(name = "CRED_MASKED_PAN"))
+    @AttributeOverride(name = "msisdn", column = @Column(name = "CRED_MSISDN"))
     @Column(nullable = false)
     private AccountReference creditorAccount;
 
@@ -55,20 +51,23 @@ public class PaymentTarget {
     private String creditorName;
 
     @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "street", column = @Column(name = "CRED_STREET")),
-            @AttributeOverride(name = "buildingNumber", column = @Column(name = "CRED_BLD_NBR")),
-            @AttributeOverride(name = "city", column = @Column(name = "CRED_CITY")),
-            @AttributeOverride(name = "postalCode", column = @Column(name = "CRED_ZIP")),
-            @AttributeOverride(name = "country", column = @Column(name = "CRED_CTRY"))
-    })
+    @AttributeOverride(name = "street", column = @Column(name = "CRED_STREET"))
+    @AttributeOverride(name = "buildingNumber", column = @Column(name = "CRED_BLD_NBR"))
+    @AttributeOverride(name = "city", column = @Column(name = "CRED_CITY"))
+    @AttributeOverride(name = "postalCode", column = @Column(name = "CRED_ZIP"))
+    @AttributeOverride(name = "country", column = @Column(name = "CRED_CTRY"))
+    @AttributeOverride(name = "line1", column = @Column(name = "line_1"))
+    @AttributeOverride(name = "line2", column = @Column(name = "line_2"))
     private Address creditorAddress;
-
-    private String remittanceInformationUnstructured;
+    @Enumerated(EnumType.STRING)
+    private PurposeCode purposeCode;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PaymentProduct paymentProduct;
+    private ChargeBearer chargeBearer;
+
+    private String remittanceInformationUnstructured;
+    @Embedded
+    private RemittanceInformationStructured remittanceInformationStructured;
 
     @ManyToOne(optional = false)
     private Payment payment;

@@ -16,6 +16,7 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
+import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.TransactionStatusTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCAPaymentResponseTO;
@@ -29,6 +30,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -47,14 +50,23 @@ public class PaymentResource implements PaymentRestAPI {
 
     @Override
     @PreAuthorize("paymentInfoById(#paymentId)")
-    public ResponseEntity<?> getPaymentById(String paymentId) {
+    public ResponseEntity<PaymentTO> getPaymentById(String paymentId) {
         return ResponseEntity.ok(paymentService.getPaymentById(paymentId));
     }
 
     @Override
-    @PreAuthorize("paymentInit(#payment)")
-    public ResponseEntity<SCAPaymentResponseTO> initiatePayment(PaymentTypeTO paymentType, Object payment) {
+    public ResponseEntity<List<PaymentTO>> getPendingPeriodicPayments() {
+        return ResponseEntity.ok(paymentService.getPendingPeriodicPayments(scaInfoHolder.getScaInfo()));
+    }
+
+    @Override
+    public ResponseEntity<SCAPaymentResponseTO> initiatePayment(PaymentTypeTO paymentType, PaymentTO payment) {
         return new ResponseEntity<>(paymentService.initiatePayment(scaInfoHolder.getScaInfo(), payment, paymentType), HttpStatus.CREATED);
+    }
+
+    @Override
+    public ResponseEntity<SCAPaymentResponseTO> executePayment(PaymentTO payment) {
+        return ResponseEntity.accepted().body(paymentService.executePayment(scaInfoHolder.getScaInfo(), payment));
     }
 
     @Override

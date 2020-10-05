@@ -1,19 +1,22 @@
 package de.adorsys.ledgers.middleware.api.service;
 
-import de.adorsys.ledgers.middleware.api.domain.account.AccountDetailsTO;
-import de.adorsys.ledgers.middleware.api.domain.account.FundsConfirmationRequestTO;
-import de.adorsys.ledgers.middleware.api.domain.account.TransactionTO;
+import de.adorsys.ledgers.middleware.api.domain.account.*;
 import de.adorsys.ledgers.middleware.api.domain.payment.AmountTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCAConsentResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.ScaInfoTO;
 import de.adorsys.ledgers.middleware.api.domain.um.AccountAccessTO;
 import de.adorsys.ledgers.middleware.api.domain.um.AisConsentTO;
+import de.adorsys.ledgers.middleware.api.domain.um.UserRoleTO;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
+import de.adorsys.ledgers.util.domain.CustomPageableImpl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface MiddlewareAccountManagementService {
+
+    List<AccountDetailsTO> getAccountsByIbanAndCurrency(String iban, String currency);
 
     /**
      * Creates a new DepositAccount. This deposit account is then linked with the specified user.
@@ -53,6 +56,10 @@ public interface MiddlewareAccountManagementService {
      */
     List<AccountDetailsTO> listDepositAccountsByBranch(String userId);
 
+    CustomPageImpl<AccountDetailsTO> listDepositAccountsByBranchPaged(String userId, String queryParam, CustomPageableImpl pageable);
+
+    CustomPageImpl<AccountDetailsExtendedTO> getAccountsByBranchAndMultipleParams(String countryCode, String branchId, String branchLogin, String iban, Boolean blocked, CustomPageableImpl pageable);
+
     /**
      * Retrieves AccountDetails with Balance on demand
      *
@@ -70,6 +77,7 @@ public interface MiddlewareAccountManagementService {
      * @param time        the reference time.
      * @param withBalance boolean specifying if Balances has to be added to AccountDetails
      * @return account details.
+     * @deprecated shall be removed in v2.5
      */
     AccountDetailsTO getDepositAccountByIban(String iban, LocalDateTime time, boolean withBalance);
 
@@ -101,6 +109,16 @@ public interface MiddlewareAccountManagementService {
      * @return : List of transactions.
      */
     List<TransactionTO> getTransactionsByDates(String accountId, LocalDate dateFrom, LocalDate dateTo);
+
+    /**
+     * Retrieves a List of transactions by accountId and dates (from/to) if dateTo is empty it is considered that requested date is today
+     *
+     * @param accountId the account id
+     * @param dateFrom  from this time
+     * @param dateTo    to this time
+     * @return : List of transactions.
+     */
+    CustomPageImpl<TransactionTO> getTransactionsByDatesPaged(String accountId, LocalDate dateFrom, LocalDate dateTo, CustomPageableImpl pageable);
 
     /**
      * Confirm the availability of funds on user account to perform the operation with specified amount
@@ -164,4 +182,22 @@ public interface MiddlewareAccountManagementService {
      * @param userId id of the user
      */
     List<AccountAccessTO> getAccountAccesses(String userId);
+
+    /**
+     * Remove all transactions for deposit account
+     *
+     * @param userId    id of the user
+     * @param userRole  role of user initiating operation
+     * @param accountId the account id
+     */
+    void deleteTransactions(String userId, UserRoleTO userRole, String accountId);
+
+    void deleteAccount(String userId, UserRoleTO userRole, String accountId);
+
+    void deleteUser(String userId, UserRoleTO userRole, String userToDeleteId);
+
+    AccountReportTO getAccountReport(String accountId);
+
+    boolean changeStatus(String accountId, boolean systemBlock);
+
 }

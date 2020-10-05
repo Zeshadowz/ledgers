@@ -1,12 +1,15 @@
 package de.adorsys.ledgers.deposit.api.domain;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.Currency;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class DepositAccountBO {
@@ -50,8 +53,6 @@ public class DepositAccountBO {
 
     private AccountTypeBO accountType;
 
-    private AccountStatusBO accountStatus = AccountStatusBO.ENABLED;
-
     /*
      * SWIFT
      * 4 letters bankCode + 2 letters CountryCode + 2 symbols CityCode + 3 symbols BranchCode
@@ -77,4 +78,27 @@ public class DepositAccountBO {
      * - characteristics of the relevant card
      */
     private String details;
+
+    private boolean blocked;
+
+    private boolean systemBlocked;
+
+    private String branch;
+
+    private LocalDateTime created;
+
+    public boolean isEnabled() {
+        return !blocked && !systemBlocked;
+    }
+
+    public AccountReferenceBO getReference() {
+        AccountReferenceBO reference = new AccountReferenceBO();
+        reference.setIban(iban);
+        reference.setCurrency(currency);
+        reference.setBban(bban);
+        reference.setMsisdn(msisdn);
+        reference.setPan(pan);
+        reference.setMaskedPan(maskedPan);
+        return reference;
+    }
 }

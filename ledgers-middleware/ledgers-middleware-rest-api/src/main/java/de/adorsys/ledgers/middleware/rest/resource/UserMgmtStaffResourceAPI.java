@@ -1,23 +1,28 @@
 package de.adorsys.ledgers.middleware.rest.resource;
 
+import de.adorsys.ledgers.middleware.api.domain.general.RevertRequestTO;
+import de.adorsys.ledgers.middleware.api.domain.oauth.AuthoriseForUserTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCALoginResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.um.*;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
 import io.swagger.annotations.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Api(tags = "LDG007 - User Management (STAFF access)",
-        description = "Provides endpoint for registering, authorizing and managing users by staff management")
+@Api(tags = "LDG010 - User Management (STAFF access)")
 public interface UserMgmtStaffResourceAPI {
     String BASE_PATH = "/staff-access" + UserMgmtRestAPI.BASE_PATH;
     String BRANCH = "branch";
     String ROLES = "roles";
+    String QUERY_PARAM = "queryParam";
+    String BLOCKED = "blockedParam";
+    String PAGE = "page";
+    String SIZE = "size";
     String USER_ID = "userId";
     String USER_NOT_IN_BRANCH = "User is not your branch";
     String USER_CANNOT_REGISTER_IN_BRANCH = "User cannot register for this branch. The branch is occupied by other user";
-    String USER_EMAIL_OR_LOGIN_TAKEN = "Provided email or login are already taken";
 
     /**
      * Registers a new user within a given branch.
@@ -31,6 +36,30 @@ public interface UserMgmtStaffResourceAPI {
     })
     @PostMapping("/register")
     ResponseEntity<UserTO> register(@RequestParam(BRANCH) String branch, @RequestBody UserTO branchStaff);
+
+    @ApiOperation(tags = UnprotectedEndpoint.UNPROTECTED_ENDPOINT, value = "Login fo user")
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = UserTO.class, message = "The user data record without the pin."),
+            @ApiResponse(code = 404, message = "User not found.")
+    })
+    @PostMapping("/admin/authorize/user")
+    ResponseEntity<SCALoginResponseTO> authoriseForUser(@RequestBody AuthoriseForUserTO authorise);
+
+    /**
+     * Modify a user within a given branch.
+     *
+     * @return user object without pin
+     */
+    @ApiOperation(value = "Modify user",
+            notes = "Modify existing user within the same branch as creator.",
+            authorizations = @Authorization(value = "apiKey"))
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = UserTO.class, message = "Success. Updated user is provided in the response."),
+            @ApiResponse(code = 401, message = "Wrong authentication credential."),
+            @ApiResponse(code = 403, message = "Authenticated but user does not have the requested role.")
+    })
+    @PostMapping("/modify")
+    ResponseEntity<UserTO> modifyUser(@RequestParam(BRANCH) String branch, @RequestBody UserTO user);
 
     /**
      * Authorize returns a bearer token that can be reused by the consuming application.
@@ -66,8 +95,6 @@ public interface UserMgmtStaffResourceAPI {
     @PostMapping
     ResponseEntity<UserTO> createUser(@RequestBody UserTO user);
 
-    // TODO: pagination for users and limit users for branch
-
     /**
      * Lists users within the branch and roles
      *
@@ -83,7 +110,27 @@ public interface UserMgmtStaffResourceAPI {
     })
 
     @GetMapping
-    ResponseEntity<List<UserTO>> getBranchUsersByRoles(@RequestParam(ROLES) List<UserRoleTO> roles);
+    ResponseEntity<CustomPageImpl<UserTO>> getBranchUsersByRoles(
+            @RequestParam(ROLES) List<UserRoleTO> roles,
+            @RequestParam(value = QUERY_PARAM, defaultValue = "", required = false) String queryParam,
+            @RequestParam(value = BLOCKED, required = false) Boolean blockedParam,
+            @RequestParam(PAGE) int page, @RequestParam(SIZE) int size);
+
+    /**
+     * Get list of user logins within the branch.
+     *
+     * @return list of user logins.
+     */
+    @ApiOperation(value = "Lists user logins by branch",
+            notes = "Lists user logins by branch.",
+            authorizations = @Authorization(value = "apiKey"))
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = UserTO.class, message = "Success. List of logins received."),
+            @ApiResponse(code = 401, message = "Wrong authentication credential."),
+            @ApiResponse(code = 403, message = "Authenticated but user does not have the requested role.")
+    })
+    @GetMapping("/logins")
+    ResponseEntity<List<String>> getBranchUserLogins();
 
     /**
      * Gets user by ID if it's within the branch
@@ -135,4 +182,16 @@ public interface UserMgmtStaffResourceAPI {
     })
     @PutMapping("/access/{userId}")
     ResponseEntity<Void> updateAccountAccessForUser(@PathVariable(USER_ID) String userId, @RequestBody AccountAccessTO access);
+
+    @ApiOperation(value = "Block/Unblock user",
+            notes = "Changes block state for given user, returns status being set to the block",
+            authorizations = @Authorization(value = "apiKey"))
+    @PostMapping("/{userId}/status")
+    ResponseEntity<Boolean> changeStatus(@PathVariable(USER_ID) String userId);
+
+
+    @PostMapping("/revert")
+    @ApiOperation(value = "Reverts DB state for given user to the given date and time.", authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<Void> revertDatabase(@RequestBody RevertRequestTO revertRequest);
+
 }

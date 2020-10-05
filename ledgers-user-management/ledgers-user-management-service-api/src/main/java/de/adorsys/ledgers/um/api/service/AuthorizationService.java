@@ -23,6 +23,8 @@ public interface AuthorizationService {
      */
     BearerTokenBO authorise(String login, String pin, UserRoleBO role, String scaId, String authorisationId);
 
+    BearerTokenBO authorizeNewAuthorizationId(ScaInfoBO scaInfoBO, String authorizationId);
+
     /**
      * Check if the provided token is valid at the given reference time and return the corresponding user.
      *
@@ -56,4 +58,6 @@ public interface AuthorizationService {
      * @return the bearer token
      */
     BearerTokenBO loginToken(ScaInfoBO scaInfoBO);
+
+    boolean validateCredentials(String login, String pin, UserRoleBO role);
 }

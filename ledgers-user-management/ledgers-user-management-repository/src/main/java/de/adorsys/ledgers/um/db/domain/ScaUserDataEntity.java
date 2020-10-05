@@ -27,6 +27,12 @@ public class ScaUserDataEntity {
     @Column
     private String staticTan;
 
+    @Column(nullable = false)
+    private boolean valid;
+
+    @OneToOne(mappedBy = "scaUserData")
+    private EmailVerificationEntity emailVerification;
+
     @PrePersist
     public void prePersist() {
         if (id == null) {

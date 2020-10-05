@@ -16,6 +16,8 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
+import de.adorsys.ledgers.middleware.api.domain.account.AccountReferenceTO;
+import de.adorsys.ledgers.middleware.api.domain.sca.AuthConfirmationTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.OpTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCALoginResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.um.BearerTokenTO;
@@ -23,6 +25,7 @@ import de.adorsys.ledgers.middleware.api.domain.um.ScaUserDataTO;
 import de.adorsys.ledgers.middleware.api.domain.um.UserRoleTO;
 import de.adorsys.ledgers.middleware.api.domain.um.UserTO;
 import de.adorsys.ledgers.middleware.api.exception.MiddlewareModuleException;
+import de.adorsys.ledgers.middleware.api.service.MiddlewareAuthConfirmationService;
 import de.adorsys.ledgers.middleware.api.service.MiddlewareOnlineBankingService;
 import de.adorsys.ledgers.middleware.api.service.MiddlewareUserManagementService;
 import de.adorsys.ledgers.middleware.rest.annotation.MiddlewareUserResource;
@@ -51,23 +54,26 @@ import static de.adorsys.ledgers.middleware.api.exception.MiddlewareErrorCode.AU
 public class UserMgmtResource implements UserMgmtRestAPI {
     private final MiddlewareOnlineBankingService onlineBankingService;
     private final MiddlewareUserManagementService middlewareUserService;
+    private final MiddlewareAuthConfirmationService authConfirmationService;
     private final ScaInfoHolder scaInfoHolder;
 
     @Override
+    public ResponseEntity<Boolean> multilevel(String login, String iban) {
+        return ResponseEntity.ok(middlewareUserService.checkMultilevelScaRequired(login, iban));
+    }
+
+    @Override
+    public ResponseEntity<Boolean> multilevelAccounts(String login, List<AccountReferenceTO> references) {
+        return ResponseEntity.ok(middlewareUserService.checkMultilevelScaRequired(login, references));
+    }
+
+    @Override
     public ResponseEntity<UserTO> register(String login, String email, String pin, UserRoleTO role) {
-        // TODO: add activation of non customer members.
         UserTO user = onlineBankingService.register(login, email, pin, role);
         user.setPin(null);
         return ResponseEntity.ok(user);
     }
 
-    /**
-     * Authorize returns a bearer token that can be reused by the consuming application.
-     *
-     * @param login
-     * @param pin
-     * @return
-     */
     @Override
     public ResponseEntity<SCALoginResponseTO> authorise(String login, String pin, UserRoleTO role) {
         return ResponseEntity.ok(onlineBankingService.authorise(login, pin, role));
@@ -80,13 +86,17 @@ public class UserMgmtResource implements UserMgmtRestAPI {
     }
 
     @Override
+    public ResponseEntity<SCALoginResponseTO> authoriseForConsent(String consentId, String authorisationId, OpTypeTO opType) {
+        return ResponseEntity.ok(onlineBankingService.authoriseForConsentWithToken(scaInfoHolder.getScaInfo(), consentId, authorisationId, opType));
+    }
+
+    @Override
     @PreAuthorize("loginToken(#scaId,#authorisationId)")
     public ResponseEntity<SCALoginResponseTO> selectMethod(String scaId, String authorisationId, String scaMethodId) {
         return ResponseEntity.ok(onlineBankingService.generateLoginAuthCode(scaInfoHolder.getScaInfoWithScaMethodIdAndAuthorisationId(scaMethodId, authorisationId), null, 1800));
     }
 
     @Override
-    @SuppressWarnings("PMD.CyclomaticComplexity")
     @PreAuthorize("loginToken(#scaId,#authorisationId)")
     public ResponseEntity<SCALoginResponseTO> authorizeLogin(String scaId, String authorisationId, String authCode) {
         return ResponseEntity.ok(onlineBankingService.authenticateForLogin(scaInfoHolder.getScaInfoWithAuthCode(authCode)));
@@ -116,6 +126,13 @@ public class UserMgmtResource implements UserMgmtRestAPI {
     @PreAuthorize("tokenUsage('DIRECT_ACCESS')")
     public ResponseEntity<UserTO> getUser() {
         return ResponseEntity.ok(middlewareUserService.findById(scaInfoHolder.getUserId()));
+    }
+
+    @Override
+    @PreAuthorize("tokenUsage('DIRECT_ACCESS')")
+    public ResponseEntity<Void> editSelf(UserTO user) {
+        middlewareUserService.editBasicSelf(scaInfoHolder.getUserId(), user);
+        return ResponseEntity.accepted().build();
     }
 
     @Override
@@ -156,6 +173,18 @@ public class UserMgmtResource implements UserMgmtRestAPI {
     @Override
     @PreAuthorize("hasAnyRole('STAFF','SYSTEM')")
     public ResponseEntity<List<UserTO>> getAllUsers() {
-        return ResponseEntity.ok(middlewareUserService.listUsers(0, 150));
+        return ResponseEntity.ok(middlewareUserService.listUsers(0, 1000));
+    }
+
+    @Override
+    @PreAuthorize("tokenUsages('DIRECT_ACCESS','DELEGATED_ACCESS')")
+    public ResponseEntity<AuthConfirmationTO> verifyAuthConfirmationCode(String authorisationId, String authConfirmCode) {
+        return ResponseEntity.ok(authConfirmationService.verifyAuthConfirmationCode(authorisationId, authConfirmCode, scaInfoHolder.getScaInfo().getUserLogin()));
+    }
+
+    @Override
+    @PreAuthorize("tokenUsages('DIRECT_ACCESS','DELEGATED_ACCESS')")
+    public ResponseEntity<AuthConfirmationTO> completeAuthConfirmation(String authorisationId, boolean authCodeConfirmed) {
+        return ResponseEntity.ok(authConfirmationService.completeAuthConfirmation(authorisationId, authCodeConfirmed, scaInfoHolder.getScaInfo().getUserLogin()));
     }
 }

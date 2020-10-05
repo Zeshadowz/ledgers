@@ -2,13 +2,13 @@ package de.adorsys.ledgers.deposit.api.service.mappers;
 
 import de.adorsys.ledgers.deposit.api.domain.AccountReferenceBO;
 import de.adorsys.ledgers.deposit.api.domain.DepositAccountBO;
+import de.adorsys.ledgers.deposit.db.domain.AccountReference;
 import de.adorsys.ledgers.deposit.db.domain.DepositAccount;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 import java.util.List;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface DepositAccountMapper {
 
     DepositAccountBO toDepositAccountBO(DepositAccount depositAccount);
@@ -17,9 +17,8 @@ public interface DepositAccountMapper {
 
     DepositAccount toDepositAccount(DepositAccountBO depositAccount);
 
-    @Mapping(target = "id", expression = "java(de.adorsys.ledgers.util.Ids.id())")
-    DepositAccount createDepositAccountObj(DepositAccount depositAccount);
-
     AccountReferenceBO toAccountReferenceBO(DepositAccount depositAccount);
+
+    AccountReference toAccountReference(AccountReferenceBO reference);
 
 }

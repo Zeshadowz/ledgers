@@ -7,16 +7,17 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import de.adorsys.ledgers.um.api.domain.*;
-import de.adorsys.ledgers.um.api.exception.UserManagementModuleException;
 import de.adorsys.ledgers.um.api.service.AuthorizationService;
 import de.adorsys.ledgers.um.api.service.UserService;
 import de.adorsys.ledgers.um.db.domain.UserRole;
 import de.adorsys.ledgers.util.Ids;
 import de.adorsys.ledgers.util.PasswordEnc;
+import de.adorsys.ledgers.util.exception.UserManagementModuleException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
@@ -25,7 +26,8 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static de.adorsys.ledgers.um.api.exception.UserManagementErrorCode.INSUFFICIENT_PERMISSION;
+import static de.adorsys.ledgers.util.exception.UserManagementErrorCode.INSUFFICIENT_PERMISSION;
+import static de.adorsys.ledgers.util.exception.UserManagementModuleException.getUserBlockedSupplier;
 
 @Slf4j
 @Service
@@ -40,7 +42,8 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     private static final String WRONG_JWS_ALGO_FOR_TOKEN_WITH_SUBJECT = "Wrong jws algo for token with subject : {}";
     private static final String USER_DOES_NOT_HAVE_THE_ROLE_S = "User with id %s and login %s does not have the role %s";
 
-    private static final int defaultLoginTokenExpireInSeconds = 600; // 600 seconds.
+    @Value("${ledgers.default.token.lifetime.seconds:600}")
+    private int defaultLoginTokenExpireInSeconds;
 
     private final HashMacSecretSource secretSource;
     private final BearerTokenService bearerTokenService;
@@ -54,13 +57,25 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         if (!success) {
             return null;
         }
-
         // Check user has defined role.
+        return getLoginToken(scaId, authorisationId, user, role);
+    }
+
+    @Override
+    public BearerTokenBO authorizeNewAuthorizationId(ScaInfoBO scaInfoBO, String authorizationId) {
+        UserBO user = userService.findByLogin(scaInfoBO.getUserLogin());
+        // Check user has defined role.
+        return getLoginToken(scaInfoBO.getScaId(), authorizationId, user, scaInfoBO.getUserRole());
+    }
+
+    private BearerTokenBO getLoginToken(String scaId, String authorisationId, UserBO user, UserRoleBO role) {
         UserRoleBO userRole = user.getUserRoles().stream().filter(r -> r.name().equals(role.name()))
                                       .findFirst().orElseThrow(() -> UserManagementModuleException.builder()
                                                                              .errorCode(INSUFFICIENT_PERMISSION)
                                                                              .devMsg(String.format(USER_DOES_NOT_HAVE_THE_ROLE_S, user.getId(), user.getLogin(), role))
                                                                              .build());
+
+        checkUserForBlocking(EnumSet.of(UserRoleBO.STAFF, UserRoleBO.SYSTEM), user);
 
         String scaIdParam = scaId != null
                                     ? scaId
@@ -71,8 +86,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
 
         Date issueTime = new Date();
         Date expires = DateUtils.addSeconds(issueTime, defaultLoginTokenExpireInSeconds);
-        return bearerTokenService.bearerToken(user.getId(), user.getLogin(),
-                null, null, UserRole.valueOf(userRole.name()), scaIdParam, authorisationIdParam, issueTime, expires, TokenUsageBO.LOGIN, null);
+        return bearerTokenService.bearerToken(user.getId(), user.getLogin(), null, null, UserRole.valueOf(userRole.name()), scaIdParam, authorisationIdParam, issueTime, expires, TokenUsageBO.LOGIN, null);
     }
 
     @Override
@@ -105,6 +119,9 @@ public class AuthorizationServiceImpl implements AuthorizationService {
             // Retrieve user.
             UserBO user = userService.findById(jwtClaimsSet.getSubject());
 
+            // Check if user is blocked.
+            checkUserForBlocking(Collections.singleton(UserRoleBO.SYSTEM), user);
+
             AccessTokenBO accessTokenJWT = bearerTokenService.toAccessTokenObject(jwtClaimsSet);
 
             validateAccountAccesses(user, accessTokenJWT);
@@ -133,7 +150,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         act.put("tppId", tppId);
         UserRole userRole = UserRole.valueOf(scaInfoBO.getUserRole().name());
         return bearerTokenService.bearerToken(user.getId(), user.getLogin(), null, aisConsent, userRole,
-                scaInfoBO.getScaId(), scaInfoBO.getAuthorisationId(), issueTime, expires, TokenUsageBO.DELEGATED_ACCESS, act);
+                                              scaInfoBO.getScaId(), scaInfoBO.getAuthorisationId(), issueTime, expires, TokenUsageBO.DELEGATED_ACCESS, act);
     }
 
     @Override
@@ -146,45 +163,53 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         return getToken(scaInfoBO, TokenUsageBO.LOGIN);
     }
 
+    @Override
+    public boolean validateCredentials(String login, String pin, UserRoleBO role) {
+        UserBO user = userService.findByLogin(login);
+        return passwordEnc.verify(user.getId(), pin, user.getPin())
+                       && user.getUserRoles().stream().anyMatch(r -> r.equals(role));
+    }
+
     private void validateAccountAccesses(UserBO user, AccessTokenBO accessTokenJWT) {
         List<AccountAccessBO> accountAccessesFromToken = accessTokenJWT.getAccountAccesses();
         for (AccountAccessBO accountAccessFT : accountAccessesFromToken) {
-            confirmAndReturnAccess(user.getId(), accountAccessFT, user.getAccountAccesses());
+            AccountAccessBO account = confirmAndReturnAccess(user.getId(), accountAccessFT, user.getAccountAccesses());
+            log.info("Account {} was successfully validated", account.getIban());
         }
     }
 
-    private void confirmAndReturnAccess(String subject, AccountAccessBO accountAccessFT, List<AccountAccessBO> accountAccesses) {
-        accountAccesses.stream()
-                .filter(a -> matchAccess(accountAccessFT, a))
-                .findFirst()
-                .orElseThrow(() -> {
-                    String message = String.format(PERMISSION_MODEL_CHANGED_NO_SUFFICIENT_PERMISSION, subject, accountAccessFT.getIban());
-                    log.warn(message);
-                    return UserManagementModuleException.builder()
-                                   .errorCode(INSUFFICIENT_PERMISSION)
-                                   .devMsg(message)
-                                   .build();
-                });
+    private AccountAccessBO confirmAndReturnAccess(String subject, AccountAccessBO accountAccessFT, List<AccountAccessBO> accountAccesses) {
+        return accountAccesses.stream()
+                       .filter(a -> matchAccess(accountAccessFT, a))
+                       .findFirst()
+                       .orElseThrow(() -> {
+                           String message = String.format(PERMISSION_MODEL_CHANGED_NO_SUFFICIENT_PERMISSION, subject, accountAccessFT.getIban());
+                           log.warn(message);
+                           return UserManagementModuleException.builder()
+                                          .errorCode(INSUFFICIENT_PERMISSION)
+                                          .devMsg(message)
+                                          .build();
+                       });
     }
 
     private boolean matchAccess(AccountAccessBO requested, AccountAccessBO existent) {
         return
                 // Same iban
                 StringUtils.equals(requested.getIban(), existent.getIban())
-                        &&
+                        // Same currency
+                        && requested.getCurrency().equals(existent.getCurrency())
                         // Make sure old access still valid
-                        requested.getAccessType().compareTo(existent.getAccessType()) <= 0;
+                        && requested.getAccessType().compareTo(existent.getAccessType()) <= 0;
     }
 
     private BearerTokenBO getToken(ScaInfoBO scaInfoBO, TokenUsageBO usageType) {
         UserBO user = userService.findById(scaInfoBO.getUserId());
         Date issueTime = new Date();
         Date expires = DateUtils.addSeconds(issueTime, defaultLoginTokenExpireInSeconds);
-
         return bearerTokenService.bearerToken(user.getId(), user.getLogin(),
-                null, null, UserRole.valueOf(scaInfoBO.getUserRole().name()),
-                scaInfoBO.getScaId(), scaInfoBO.getAuthorisationId(),
-                issueTime, expires, usageType, null);
+                                              null, null, UserRole.valueOf(scaInfoBO.getUserRole().name()),
+                                              scaInfoBO.getScaId(), scaInfoBO.getAuthorisationId(),
+                                              issueTime, expires, usageType, null);
     }
 
     private Date getExpirationDate(AisConsentBO aisConsent, Date iat) {
@@ -231,6 +256,17 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                           .errorCode(INSUFFICIENT_PERMISSION)
                           .devMsg(String.format(message, userId, copy.toString()))
                           .build();
+        }
+    }
+
+    private void checkUserForBlocking(Set<UserRoleBO> userRoles, UserBO user) {
+
+        if (user.isBlocked() &&
+                    user.getUserRoles()
+                            .stream()
+                            .noneMatch(userRoles::contains)) {
+            log.info("User with id {} is blocked by configuration", user.getId());
+            throw getUserBlockedSupplier(true).get();
         }
     }
 }

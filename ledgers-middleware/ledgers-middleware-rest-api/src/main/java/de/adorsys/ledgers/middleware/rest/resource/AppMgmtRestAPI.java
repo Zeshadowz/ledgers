@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@Api(tags = "LDG005 - Application Management", description = "Application management")
+@Api(tags = "LDG001 - Application Management", description = "Application management")
 public interface AppMgmtRestAPI {
     String BASE_PATH = "/management/app";
 
@@ -40,5 +40,4 @@ public interface AppMgmtRestAPI {
     @PostMapping("/admin")
     @ApiOperation(tags = UnprotectedEndpoint.UNPROTECTED_ENDPOINT, value = "Creates the admin account. This is only done if the application has no account yet. Returns a bearer token admin can use to proceed with further operations.")
     ResponseEntity<BearerTokenTO> admin(@RequestBody(required = true) UserTO adminUser);
-
 }

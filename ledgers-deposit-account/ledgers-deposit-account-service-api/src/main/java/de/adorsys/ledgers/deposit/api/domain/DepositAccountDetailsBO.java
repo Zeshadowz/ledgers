@@ -14,4 +14,8 @@ import java.util.List;
 public class DepositAccountDetailsBO {
     private DepositAccountBO account;
     private List<BalanceBO> balances = new ArrayList<>();
+
+    public boolean isEnabled() {
+        return !account.isBlocked() && !account.isSystemBlocked();
+    }
 }

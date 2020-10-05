@@ -2,9 +2,11 @@ package de.adorsys.ledgers.um.db.domain;
 
 import de.adorsys.ledgers.util.Ids;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
 import org.jetbrains.annotations.NotNull;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 
 //Todo clarify unique constrains iban & access_type
 @Entity
@@ -22,16 +24,27 @@ public class AccountAccess {
 
     @NotNull
     @Column(nullable = false)
+    private String currency;
+
+    @NotNull
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private AccessType accessType= AccessType.OWNER;
+    private AccessType accessType = AccessType.OWNER;
 
     @Column(nullable = false)
     private int scaWeight;
-    
+
+    @Column(nullable = false)
+    private String accountId;
+
+    @Column
+    @CreationTimestamp
+    private LocalDateTime created;
+
     @PrePersist
     public void prePersist() {
-    	if(id==null) {
-    		id = Ids.id();
-    	}
+        if (id == null) {
+            id = Ids.id();
+        }
     }
 }

@@ -1,10 +1,8 @@
 package de.adorsys.ledgers.sca.service;
 
-import de.adorsys.ledgers.sca.domain.AuthCodeDataBO;
-import de.adorsys.ledgers.sca.domain.OpTypeBO;
-import de.adorsys.ledgers.sca.domain.SCAOperationBO;
-import de.adorsys.ledgers.sca.domain.ScaStatusBO;
+import de.adorsys.ledgers.sca.domain.*;
 import de.adorsys.ledgers.um.api.domain.UserBO;
+import de.adorsys.ledgers.util.exception.ScaModuleException;
 
 public interface SCAOperationService {
 
@@ -24,11 +22,10 @@ public interface SCAOperationService {
      *
      * @param authorisationId : the id of this authorization instance.
      * @param opId            : This is the id of the operation like provided by the consuming module.
-     * @param opData          : This are data to be linked to the generated One Time Password.
      * @param authCode        : This auth code was generated at previous step @see #generateAuthCode(String opId, String opData, int validitySeconds)
-     * @return true if auth code is valid in other cases false will be returned
+     * @return SCA validation object
      */
-    boolean validateAuthCode(String authorisationId, String opId, String opData, String authCode, int scaWeight);
+    ScaValidationBO validateAuthCode(String authorisationId, String opId, String authCode, int scaWeight);
 
 
     /**
@@ -55,14 +52,6 @@ public interface SCAOperationService {
     SCAOperationBO loadAuthCode(String authorizationId);
 
     /**
-     * load all auth code associated with the given operation id
-     *
-     * @param opId identifier of primary operation for which authorization is carried
-     * @return list of SCA operations
-     */
-    //List<SCAOperationBO> loadAuthCodesByOpId(String opId);
-
-    /**
      * Return true if all authorization instances of this operation are validated.
      *
      * @param opId   identifier of primary operation for which authorization is carried
@@ -70,4 +59,24 @@ public interface SCAOperationService {
      * @return boolean representation of success or failure
      */
     boolean authenticationCompleted(String opId, OpTypeBO opType);
+
+    /**
+     * Verify auth confirmation code
+     *
+     * @param authorisationId : the id of this authorization instance.
+     * @param confirmationCode : Auth confirmation code
+     */
+    ScaAuthConfirmationBO verifyAuthConfirmationCode(String authorisationId, String confirmationCode);
+
+    /**
+     * Compete auth confirmation process
+     *
+     * @param authorisationId : the id of this authorization instance.
+     * @param authCodeConfirmed : Auth confirmation code was successfully confirmed or not
+     */
+    ScaAuthConfirmationBO completeAuthConfirmation(String authorisationId, boolean authCodeConfirmed);
+
+    SCAOperationBO checkIfExistsOrNew(AuthCodeDataBO data);
+
+    ScaModuleException updateFailedCount(String authorisationId, boolean isLoginOperation);
 }

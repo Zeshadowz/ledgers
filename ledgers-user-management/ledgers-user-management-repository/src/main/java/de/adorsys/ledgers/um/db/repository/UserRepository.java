@@ -16,11 +16,16 @@
 
 package de.adorsys.ledgers.um.db.repository;
 
+import de.adorsys.ledgers.um.db.domain.AccessType;
 import de.adorsys.ledgers.um.db.domain.UserEntity;
 import de.adorsys.ledgers.um.db.domain.UserRole;
-import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.PagingAndSortingRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,23 +47,28 @@ public interface UserRepository extends PagingAndSortingRepository<UserEntity, S
      */
     Optional<UserEntity> findByEmailOrLogin(String email, String login);
 
-    /**
-     * List all users
-     *
-     * @return list of users
-     */
-    @NotNull
-    @Override
-    List<UserEntity> findAll();
+    @Modifying
+    @Query("update UserEntity u set u.systemBlocked=?2 where u.branch=?1")
+    void updateSystemBlockedStatus(String branchId, boolean status);
 
-    /**
-     * Finds all users of the branch with the given roles
-     *
-     * @param branch branch
-     * @param roles  user roles
-     * @return list pf users
-     */
-    List<UserEntity> findByBranchAndUserRolesIn(String branch, List<UserRole> roles);
+    @Modifying
+    @Query("update UserEntity u set u.blocked=?2 where u.branch=?1")
+    void updateBlockedStatus(String branchId, boolean status);
+
+    @Modifying
+    @Query("update UserEntity u set u.systemBlocked=?2 where u.id=?1")
+    void updateUserSystemBlockedStatus(String userId, boolean status);
+
+    @Modifying
+    @Query("update UserEntity u set u.blocked=?2 where u.id=?1")
+    void updateUserBlockedStatus(String userId, boolean status);
+
+    @Query("select distinct u from UserEntity u where u.branch like ?1% and u.branch like  %?2% and u.login like %?3% and ?4 member of u.userRoles and u.systemBlocked=false ")
+    List<UserEntity> findBranchIdsByMultipleParameters(String countryCode, String branchId, String branchLogin, UserRole role);
+
+    Page<UserEntity> findByBranchInAndLoginContainingAndUserRolesInAndBlockedInAndSystemBlockedFalse(Collection<String> branch, String login, Collection<UserRole> userRoles, Collection<Boolean> blocked, Pageable pageable);
+
+    Page<UserEntity> findByUserRolesIn(Collection<UserRole> userRoles, Pageable pageable);
 
     /**
      * Counts amount of users for a branch
@@ -69,4 +79,18 @@ public interface UserRepository extends PagingAndSortingRepository<UserEntity, S
     int countByBranch(String branch);
 
     Optional<UserEntity> findByLoginAndEmail(String login, String email);
+
+    @Query(value = "select distinct u from UserEntity u join u.accountAccesses a where a.iban = ?1")
+    List<UserEntity> findUsersByIban(String iban);
+
+    @Query(value = "select distinct u from UserEntity u join u.accountAccesses a where a.iban = ?1 and a.accessType = ?2")
+    List<UserEntity> findOwnersByIban(String iban, AccessType accessType);
+
+    @Query(value = "select distinct u from UserEntity u join u.accountAccesses a where a.accountId = ?1 and a.accessType = ?2")
+    List<UserEntity> findOwnersByAccountId(String accountId, AccessType accessType);
+
+    List<UserEntity> findByBranch(String branchId);
+
+    @Query(value = "select u from UserEntity u where u.login=?1 or u.email=?1")
+    Optional<UserEntity> findByLoginOrEmail(String loginOrEmail);
 }

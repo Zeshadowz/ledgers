@@ -1,5 +1,6 @@
 package de.adorsys.ledgers.app.initiation;
 
+import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.OpTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCALoginResponseTO;
@@ -29,14 +30,14 @@ public class PaymentRestInitiationService {
         this.authRequestInterceptor = authRequestInterceptor;
     }
 
-    public void executePayment(UserTO user, PaymentTypeTO paymentType, Object payment) {
+    public void executePayment(UserTO user, PaymentTypeTO paymentType, PaymentTO payment) {
         try {
             loginUser(user);
             SCAPaymentResponseTO response = paymentRestClient.initiatePayment(paymentType, payment).getBody();
             logger.info("Payment from: {}, successfully committed, payment ID: {}, transaction status: {}", user.getLogin(), response.getPaymentId(), response.getTransactionStatus());
             performScaIfRequired(response);
         } catch (FeignException e) {
-            logger.error("Payment from: {}, failed due to: {}", user.getLogin(), e.getMessage());
+            logger.error("Payment from: {}, failed due to: {}", user.getLogin(), e.contentUTF8());
         }
     }
 
@@ -44,7 +45,7 @@ public class PaymentRestInitiationService {
     private void performScaIfRequired(SCAPaymentResponseTO response) {
         //Select Sca Method
         try {
-            if (response.getScaStatus() == ScaStatusTO.PSUIDENTIFIED) {
+            if (response.getScaStatus() == ScaStatusTO.PSUAUTHENTICATED) {
                 response = paymentRestClient.selectMethod(response.getPaymentId(), response.getAuthorisationId(), response.getScaMethods().iterator().next().getId()).getBody();
                 authRequestInterceptor.setAccessToken(response.getBearerToken().getAccess_token());
             }

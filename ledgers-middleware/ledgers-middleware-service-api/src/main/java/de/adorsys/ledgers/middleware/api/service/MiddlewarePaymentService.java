@@ -16,10 +16,13 @@
 
 package de.adorsys.ledgers.middleware.api.service;
 
+import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.TransactionStatusTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCAPaymentResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.ScaInfoTO;
+
+import java.util.List;
 
 public interface MiddlewarePaymentService {
 
@@ -35,8 +38,16 @@ public interface MiddlewarePaymentService {
      * @param paymentType : the payment type
      * @return : the sca response object.
      */
-    <T> SCAPaymentResponseTO initiatePayment(ScaInfoTO scaInfoTO, T payment, PaymentTypeTO paymentType);
+    SCAPaymentResponseTO initiatePayment(ScaInfoTO scaInfoTO, PaymentTO payment, PaymentTypeTO paymentType);
 
+    /**
+     * Executes a payment
+     *
+     * @param scaInfoTO   : SCA information
+     * @param payment     : the payment object
+     * @return : the sca response object.
+     */
+    SCAPaymentResponseTO executePayment(ScaInfoTO scaInfoTO, PaymentTO payment);
 
     // ================= SCA =======================================//
 
@@ -74,7 +85,7 @@ public interface MiddlewarePaymentService {
      * @param paymentId : the payment id
      * @return the payment
      */
-    Object getPaymentById(String paymentId);
+    PaymentTO getPaymentById(String paymentId);
 
     /**
      * Checks the possibility of payment cancellation
@@ -98,4 +109,5 @@ public interface MiddlewarePaymentService {
 
     SCAPaymentResponseTO authorizeCancelPayment(ScaInfoTO scaInfoTO, String paymentId, String cancellationId);
 
+    List<PaymentTO> getPendingPeriodicPayments(ScaInfoTO scaInfoTO);
 }

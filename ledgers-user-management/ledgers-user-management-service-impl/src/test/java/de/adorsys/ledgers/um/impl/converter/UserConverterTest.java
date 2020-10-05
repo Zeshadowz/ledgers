@@ -1,134 +1,208 @@
 package de.adorsys.ledgers.um.impl.converter;
 
-import de.adorsys.ledgers.um.api.domain.AccountAccessBO;
-import de.adorsys.ledgers.um.api.domain.ScaUserDataBO;
-import de.adorsys.ledgers.um.api.domain.UserBO;
-import de.adorsys.ledgers.um.api.domain.UserRoleBO;
+import de.adorsys.ledgers.um.api.domain.*;
 import de.adorsys.ledgers.um.db.domain.AccountAccess;
 import de.adorsys.ledgers.um.db.domain.ScaUserDataEntity;
 import de.adorsys.ledgers.um.db.domain.UserEntity;
 import de.adorsys.ledgers.um.db.domain.UserRole;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 import pro.javatar.commons.reader.YamlReader;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class UserConverterTest {
     public static final String USER_ID = "someID";
-    public static final String USER_EMAIL = "spe@adorsys.com.ua";
-    public static final String USER_LOGIN = "speex";
-    public static final String USER_PIN = "1234567890";
+    private static final String USER_EMAIL = "spe@adorsys.com.ua";
+    private static final String USER_LOGIN = "speex";
+    private static final String USER_PIN = "1234567890";
+    private static final String SCA_ID = "0UaAHbFRQxUpptZmyjq9XQ";
     private static final List<ScaUserDataEntity> scaUserDataEntityList = readListYml(ScaUserDataEntity.class, "sca-user-data.yml");
     private static final List<ScaUserDataBO> scaUserDataBOList = readListYml(ScaUserDataBO.class, "sca-user-data.yml");
     private static final List<AccountAccess> accountAccessList = readListYml(AccountAccess.class, "account-access.yml");
     private static final List<AccountAccessBO> accountAccessBOList = readListYml(AccountAccessBO.class, "account-access.yml");
 
-    UserConverter converter = Mappers.getMapper(UserConverter.class);
+    private UserConverter converter = Mappers.getMapper(UserConverter.class);
 
     @Test
-    public void toUserBOList() {
+    void toUserBOList() {
         //empty list case
         List<UserEntity> users = Collections.emptyList();
         List<UserBO> result = converter.toUserBOList(users);
-        assertThat(result, is(Collections.emptyList()));
+        assertEquals(Collections.emptyList(), result);
 
         //user = null
         users = Collections.singletonList(null);
         result = converter.toUserBOList(users);
-        assertThat(result, is(Collections.singletonList(new UserBO())));
+        assertEquals(Collections.singletonList(new UserBO()), result);
     }
 
     @Test
-    public void toUserEntityList() {
+    void toUserEntityList() {
         //empty list case
         List<UserBO> users = Collections.emptyList();
         List<UserEntity> result = converter.toUserEntityList(users);
-        assertThat(result, is(Collections.emptyList()));
+        assertEquals(Collections.emptyList(), result);
 
         //user = null
         users = Collections.singletonList(null);
         result = converter.toUserEntityList(users);
-        assertThat(result, is(Collections.singletonList(new UserEntity())));
+        assertEquals(Collections.singletonList(new UserEntity()), result);
     }
 
     @Test
-    public void toScaUserDataBO() {
+    void toScaUserDataBO() {
+        // When
         ScaUserDataBO result = converter.toScaUserDataBO(scaUserDataEntityList.get(0));
-        assertThat(result).isEqualToComparingFieldByFieldRecursively(scaUserDataBOList.get(0));
+
+        // Then
+        assertEquals(scaUserDataBOList.get(0), result);
     }
 
     @Test
-    public void toScaUserDataEntity() {
-        ScaUserDataEntity result = converter.toScaUserDataEntity(scaUserDataBOList.get(0));
-        assertThat(result).isEqualToComparingFieldByFieldRecursively(scaUserDataEntityList.get(0));
+    void toScaUserDataEntity_idExist() {
+        // When
+        ScaUserDataEntity result = converter.toScaUserDataEntity(getScaUserDataBO(SCA_ID));
+
+        // Then
+        assertEquals(getScaUserDataEntity(SCA_ID), result);
     }
 
     @Test
-    public void toScaUserDataListBO() {
+    void toScaUserDataEntity_idBlank() {
+        // When
+        ScaUserDataEntity result = converter.toScaUserDataEntity(getScaUserDataBO(""));
+
+        // Then
+        assertEquals(getScaUserDataEntity(null), result);
+    }
+
+    @Test
+    void toScaUserDataListBO() {
+        // When
         List<ScaUserDataBO> result = converter.toScaUserDataListBO(scaUserDataEntityList);
-        assertThat(result).containsExactlyInAnyOrderElementsOf(scaUserDataBOList);
+
+        // Then
+        assertEquals(new HashSet<>(scaUserDataBOList), new HashSet<>(result));
     }
 
     @Test
-    public void toScaUserDataListEntity() {
+    void toScaUserDataListEntity() {
+        // When
         List<ScaUserDataEntity> result = converter.toScaUserDataListEntity(scaUserDataBOList);
-        assertThat(result).containsExactlyInAnyOrderElementsOf(scaUserDataEntityList);
+
+        // Then
+        assertEquals(new HashSet<>(scaUserDataEntityList), new HashSet<>(result));
     }
 
     @Test
-    public void toAccountAccessBO() {
+    void toAccountAccessBO() {
+        // When
         AccountAccessBO result = converter.toAccountAccessBO(accountAccessList.get(0));
-        assertThat(result).isEqualToComparingFieldByFieldRecursively(accountAccessBOList.get(0));
+
+        // Then
+        assertEquals(accountAccessBOList.get(0), result);
     }
 
     @Test
-    public void toAccountAccessEntity() {
+    void toAccountAccessEntity() {
+        // When
         AccountAccess result = converter.toAccountAccessEntity(accountAccessBOList.get(0));
-        assertThat(result).isEqualToComparingFieldByFieldRecursively(accountAccessList.get(0));
+        result.setCreated(null);
+
+        AccountAccess expected = accountAccessList.get(0);
+        expected.setCreated(null);
+
+        // Then
+        assertEquals(expected, result);
     }
 
     @Test
-    public void toAccountAccessListBO() {
+    void toAccountAccessListBO() {
+        // When
         List<AccountAccessBO> result = converter.toAccountAccessListBO(accountAccessList);
-        assertThat(result).containsExactlyInAnyOrderElementsOf(accountAccessBOList);
+
+        // Then
+        assertEquals(new HashSet<>(accountAccessBOList), new HashSet<>(result));
     }
 
     @Test
-    public void toAccountAccessListEntity() {
+    void toAccountAccessListEntity() {
+        // When
         List<AccountAccess> result = converter.toAccountAccessListEntity(accountAccessBOList);
-        assertThat(result).containsExactlyInAnyOrderElementsOf(accountAccessList);
+
+        result.forEach(accountAccess -> accountAccess.setCreated(null));
+        accountAccessList.forEach(accountAccess -> accountAccess.setCreated(null));
+
+        // Then
+        assertEquals(new HashSet<>(accountAccessList), new HashSet<>(result));
     }
 
     @Test
-    public void toUserRole() {
+    void toUserRole() {
+        // When
         List<UserRole> result = converter.toUserRole(Collections.singletonList(UserRoleBO.CUSTOMER));
-        assertThat(result).isEqualTo(Collections.singletonList(UserRole.CUSTOMER));
+
+        // Then
+        assertEquals(Collections.singletonList(UserRole.CUSTOMER), result);
     }
 
     @Test
-    public void toUserBO() {
+    void toUserBO() {
+        // When
         UserBO bo = converter.toUserBO(buildUserPO());
-        assertThat(bo.getId(), is(USER_ID));
-        assertThat(bo.getEmail(), is(USER_EMAIL));
-        assertThat(bo.getLogin(), is(USER_LOGIN));
-        assertThat(bo.getPin(), is(USER_PIN));
+
+        // Then
+        assertEquals(USER_ID, bo.getId());
+        assertEquals(USER_EMAIL, bo.getEmail());
+        assertEquals(USER_LOGIN, bo.getLogin());
+        assertEquals(USER_PIN, bo.getPin());
     }
 
     @Test
-    public void toUserPO() {
+    void toUserPO() {
+        // When
         UserEntity po = converter.toUserPO(buildUserBO());
 
-        assertThat(po.getId(), is(USER_ID));
-        assertThat(po.getEmail(), is(USER_EMAIL));
-        assertThat(po.getLogin(), is(USER_LOGIN));
-        assertThat(po.getPin(), is(USER_PIN));
+        // Then
+        assertEquals(USER_ID, po.getId());
+        assertEquals(USER_EMAIL, po.getEmail());
+        assertEquals(USER_LOGIN, po.getLogin());
+        assertEquals(USER_PIN, po.getPin());
+    }
+
+    @Test
+    void toExtendedUserBO() {
+        UserExtendedBO result = converter.toUserExtendedBO(buildUserPO(), "BRANCH_LOGIN");
+        assertEquals(getExpectedExtendedUser(), result);
+    }
+
+    private UserExtendedBO getExpectedExtendedUser() {
+        UserExtendedBO bo = new UserExtendedBO();
+        bo.setId(USER_ID);
+        bo.setLogin(USER_LOGIN);
+        bo.setEmail(USER_EMAIL);
+        bo.setPin(USER_PIN);
+        bo.setBranchLogin("BRANCH_LOGIN");
+        return bo;
+    }
+
+    private ScaUserDataBO getScaUserDataBO(String id) {
+        ScaUserDataBO scaUserData = scaUserDataBOList.get(0);
+        scaUserData.setId(id);
+        return scaUserData;
+    }
+
+    private ScaUserDataEntity getScaUserDataEntity(String id) {
+        ScaUserDataEntity scaUserData = scaUserDataEntityList.get(0);
+        scaUserData.setId(id);
+        return scaUserData;
     }
 
     //todo: @spe replace by json source file

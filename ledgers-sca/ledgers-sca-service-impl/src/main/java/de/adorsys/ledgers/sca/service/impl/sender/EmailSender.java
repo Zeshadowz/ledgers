@@ -14,10 +14,10 @@ import org.springframework.stereotype.Service;
 public class EmailSender {
     private final JavaMailSender sender;
 
-    @Value("${sca.authCode.email.subject}")
+    @Value("${ledgers.sca.authCode.email.subject}")
     private String subject;
 
-    @Value("${sca.authCode.email.from}")
+    @Value("${ledgers.sca.authCode.email.from}")
     private String from;
 
     public boolean send(String value, String authCode) {
@@ -31,6 +31,7 @@ public class EmailSender {
             sender.send(message);
         } catch (MailException e) {
             log.error("Error sending email, No SMTP service configured");
+            log.error(e.getMessage());
             return false;
         }
         log.info("Auth code was successfully sent via email");

@@ -15,7 +15,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>de.adorsys.ledgers</groupId>
 	<artifactId>ledgers</artifactId>
-	<version>1.1-SNAPSHOT</version>
+	<version>3.11-SNAPSHOT</version>
 
 	<modules>
 		<module>ledgers-app</module>
@@ -27,7 +27,8 @@
 		<module>ledgers-sca</module>
 		<module>ledgers-db</module>
         <module>ledgers-security</module>
-    </modules>
+		<module>ledgers-jaxb-api</module>
+	</modules>
 
 	<packaging>pom</packaging>
 
@@ -93,28 +94,34 @@
 		<pmd.version>6.5.0</pmd.version>
 		<pmd.plugin.version>3.10.0</pmd.plugin.version>
 		<apache.commons.collections>4.3</apache.commons.collections>
+		<apache.commons.io>2.6</apache.commons.io>
 		<jetbrains.annotations.version>15.0</jetbrains.annotations.version>
 		<dbunit.version>2.5.1</dbunit.version>
 		<spring-test-dbunit.version>1.2.1</spring-test-dbunit.version>
-		<spring-security.version>5.1.5.RELEASE</spring-security.version>
+		<spring-security.version>5.2.2.RELEASE</spring-security.version>
 		<springfox-swagger2.version>2.8.0</springfox-swagger2.version>
 		<swagger-annotations.version>1.5.17</swagger-annotations.version>
 		<maven-enforcer-plugin.version>3.0.0-M2</maven-enforcer-plugin.version>
+		<maven.surefire.plugin.version>3.0.0-M4</maven.surefire.plugin.version>
 		<org.mapstruct.version>1.3.0.Final</org.mapstruct.version>
 		<lombok-plugin.version>1.16.22</lombok-plugin.version>
 		<hamcrest-library.version>1.3</hamcrest-library.version>
 		<javatar-commons.version>0.6</javatar-commons.version>
-		<mockito.version>1.10.19</mockito.version>
+
+		<junit-jupiter.version>5.5.2</junit-jupiter.version>
+		<mockito.version>3.2.4</mockito.version>
+
+		<powermock.version>2.0.5</powermock.version>
 		<commons-validator.version>1.6</commons-validator.version>
 		<!-- automatically run annotation processors within the incremental compilation -->
 		<m2e.apt.activation>jdt_apt</m2e.apt.activation>
 		<slf4j.version>1.7.25</slf4j.version>
 		<nimbus-jose-jwt.version>6.1.1</nimbus-jose-jwt.version>
 		<liquibase.version>3.6.2</liquibase.version>
-		<spring-boot-dependencies.version>2.1.1.RELEASE</spring-boot-dependencies.version>
+		<spring-boot-dependencies.version>2.2.4.RELEASE</spring-boot-dependencies.version>
 		<spring-cloud-feign.version>2.1.1.RELEASE</spring-cloud-feign.version>
 		<subethasmtp.version>3.1.7</subethasmtp.version>
-		<jackson.version>2.9.8</jackson.version>
+		<jackson.version>2.9.10</jackson.version>
 		<lombok.version>1.18.8</lombok.version>
 		<jasypt.version>1.9.3</jasypt.version>
 		<!--Sonar -->
@@ -123,7 +130,10 @@
 		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
 		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
 		<sonar.language>java</sonar.language>
-		<sonar.coverage.exclusions>**/*Entity.java,**/*TO.java,**/*Exception.java,**/*Config.java</sonar.coverage.exclusions>
+		<sonar.coverage.exclusions>**/*Entity.java,**/*TO.java,**/*BO.java,**/*PO.java,**/*Application.java,**/*Exception.java,
+			**/*Config.java,pom.xml,**/ledgers-user-management-service-api/**/*,**/ledgers-sca-service-api/**/*,**/ledgers-postings-service-api/**/*,**/ledgers-middleware-service-api/**/*,**/ledgers-deposit-account-service-api/**/*,/ledgers-jaxb-api/**/*,**/ledgers-middleware-rest-api/**/*,/ledgers-security/**/*,/ledgers-app/**/*,**/ledgers-middleware-rest-server/**/*,**/ledgers-deposit-account-repository/**/*,**/ledgers-postings-repository/**/*,**/ledgers-sca-repository/**/*,**/ledgers-user-management-repository/**/*,/ledgers-utils/**/*
+		</sonar.coverage.exclusions>
+		<sonar.moduleName>${project.artifactId}</sonar.moduleName>
 
 		<skipITs>false</skipITs>
 	</properties>
@@ -151,6 +161,11 @@
 				<scope>import</scope>
 			</dependency>
 
+			<dependency>
+				<groupId>com.fasterxml.jackson.dataformat</groupId>
+				<artifactId>jackson-dataformat-xml</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
 			<!-- spring dependencies -->
 
 			<dependency>
@@ -245,13 +260,16 @@
 				<version>${jasypt.version}</version>
 			</dependency>
 
-			<!-- test dependencies -->
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-collections4</artifactId>
+				<version>${apache.commons.collections}</version>
+			</dependency>
 
 			<dependency>
-				<groupId>org.mockito</groupId>
-				<artifactId>mockito-all</artifactId>
-				<version>${mockito.version}</version>
-				<scope>test</scope>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${apache.commons.io}</version>
 			</dependency>
 
 			<dependency>
@@ -297,26 +315,29 @@
 		<!-- test dependencies -->
 
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${junit-jupiter.version}</version>
 			<scope>test</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>org.hamcrest</groupId>
-					<artifactId>hamcrest-core</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 
 		<dependency>
-			<groupId>org.hamcrest</groupId>
-			<artifactId>hamcrest-library</artifactId>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<version>${junit-jupiter.version}</version>
 			<scope>test</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.mockito</groupId>
-			<artifactId>mockito-all</artifactId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>hamcrest-library</artifactId>
 			<scope>test</scope>
 		</dependency>
 
@@ -328,8 +349,13 @@
 				<plugin>
 					<groupId>org.sonarsource.scanner.maven</groupId>
 					<artifactId>sonar-maven-plugin</artifactId>
-					<version>3.6.0.1398</version>
+					<version>3.7.0.1746</version>
 				</plugin>
+				<plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+					<version>${maven.surefire.plugin.version}</version>
+                </plugin>
 			</plugins>
 		</pluginManagement>
 		<plugins>
@@ -505,6 +531,12 @@
 								<goals>
 									<goal>sign</goal>
 								</goals>
+								<configuration>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
 							</execution>
 						</executions>
 					</plugin>

@@ -16,6 +16,8 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
+import de.adorsys.ledgers.middleware.api.domain.account.AccountReferenceTO;
+import de.adorsys.ledgers.middleware.api.domain.sca.AuthConfirmationTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.OpTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCALoginResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.ScaStatusTO;
@@ -29,7 +31,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Api(tags = "LDG001 - User Management", description = "Provides endpoint for registering, authorizing and managing users.")
+@Api(tags = "LDG002 - User Management", description = "Provides endpoint for registering, authorizing and managing users.")
 public interface UserMgmtRestAPI {
     String BASE_PATH = "/users";
 
@@ -38,6 +40,20 @@ public interface UserMgmtRestAPI {
     //	SELF SERVICE OPERATIONS. NO CREDENTIAL REQUIRED
     //
     //==========================================================================================================================
+
+    @GetMapping("/multilevel")
+    @ApiOperation(tags = UnprotectedEndpoint.UNPROTECTED_ENDPOINT, value = "Check if multilevel SCA required for certain user")
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = boolean.class, message = "Boolean representation of requirement for multi-level sca")
+    })
+    ResponseEntity<Boolean> multilevel(@RequestParam("login") String login, @RequestParam("iban") String iban);
+
+    @PostMapping("/multilevel")
+    @ApiOperation(tags = UnprotectedEndpoint.UNPROTECTED_ENDPOINT, value = "Check if multilevel SCA required for certain user")
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = boolean.class, message = "Boolean representation of requirement for multi-level sca")
+    })
+    ResponseEntity<Boolean> multilevelAccounts(@RequestParam("login") String login, @RequestBody List<AccountReferenceTO> references);
 
     /**
      * Registers a new user with the system. Activation is dependent on the user role.
@@ -169,6 +185,18 @@ public interface UserMgmtRestAPI {
             @RequestParam("authorisationId") String authorisationId,
             @RequestParam("opType") OpTypeTO opType);
 
+    @PostMapping("/loginForConsent/oauth")
+    @ApiOperation(value = "Login for consent operation with bearer token", authorizations = @Authorization(value = "apiKey"))
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = SCALoginResponseTO.class, message = "Success. LoginToken contained in the returned response object."),
+            @ApiResponse(code = 401, message = "Wrong authentication credential."),
+            @ApiResponse(code = 403, message = "Authenticated but user does not have the requested role.")
+    })
+    ResponseEntity<SCALoginResponseTO> authoriseForConsent(
+            @RequestParam("consentId") String consentId,
+            @RequestParam("authorisationId") String authorisationId,
+            @RequestParam("opType") OpTypeTO opType);
+
     @PostMapping("/validate")
     @ApiOperation(tags = UnprotectedEndpoint.UNPROTECTED_ENDPOINT, value = "Introspect Token", nickname = "IntrospectToken",
             notes = "Validates a JWT access token and make sure permissions contained in this token are still in synch with the state of permission associated with the underlying user."
@@ -273,6 +301,10 @@ public interface UserMgmtRestAPI {
     })
     ResponseEntity<UserTO> getUser();
 
+    @PutMapping("/me")
+    @ApiOperation(value = "Edit current User", authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<Void> editSelf(@RequestBody UserTO user);
+
     @PutMapping("/sca-data")
     @ApiOperation(value = "Updates user SCA", notes = "Updates user authentication methods."
                                                               + "<lu>"
@@ -310,5 +342,13 @@ public interface UserMgmtRestAPI {
             authorizations = @Authorization(value = "apiKey"))
     ResponseEntity<List<UserTO>> getAllUsers();
 
+    @PutMapping("/authorisations/{authorisationId}/confirmation/{authConfirmCode}")
+    @ApiOperation(value = "Send an authentication confirmation code for validation", notes = "Validate an authentication code", authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<AuthConfirmationTO> verifyAuthConfirmationCode(@PathVariable("authorisationId") String authorisationId,
+                                                                  @PathVariable(name = "authConfirmCode") String authConfirmCode);
 
+    @PutMapping("/authorisations/{authorisationId}/confirmation")
+    @ApiOperation(value = "Send an authentication confirmation code for validation", notes = "Validate an authentication code", authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<AuthConfirmationTO> completeAuthConfirmation(@PathVariable("authorisationId") String authorisationId,
+                                                                @RequestParam(value = "authCodeConfirmed", defaultValue = "false") boolean authCodeConfirmed);
 }

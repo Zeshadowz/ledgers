@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.web.context.annotation.RequestScope;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,13 +21,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
+@RequestScope
 @Configuration
 public class ChallengeDataConfig {
     private static final String DEFAULT_CHALLENGE_DATA_PATH = "classpath:sca_challenge_data.json";
     private static final String CLASSPATH_PREFIX = "classpath:";
     private static final String FILE_PREFIX = "file:";
 
-    @Value("${sca.challenge_data.path:}")
+    @Value("${ledgers.sca.challenge_data.path:}")
     private String customChallengeDataPath;
 
     @JsonAnySetter
@@ -46,6 +48,7 @@ public class ChallengeDataConfig {
     }
 
     @Bean
+    @RequestScope
     public Map<String, ChallengeDataTO> challengeDatas() {
         return challengeDatas;
     }

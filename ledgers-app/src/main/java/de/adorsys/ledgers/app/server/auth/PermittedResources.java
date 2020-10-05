@@ -2,36 +2,49 @@ package de.adorsys.ledgers.app.server.auth;
 
 public class PermittedResources {
 
-    public static final String[] SWAGGER_WHITELIST = {
+    protected static final String[] SWAGGER_WHITELIST = {
             "/swagger-resources",
             "/swagger-ui.html",
             "/v2/api-docs",
             "/webjars/**"
     };
 
-    public static final String[] INDEX_WHITELIST = {
+    protected static final String[] INDEX_WHITELIST = {
             "/index.css",
             "/img/*",
             "/favicon.ico"
     };
 
-    public static final String[] APP_WHITELIST = {
+    protected static final String[] APP_WHITELIST = {
             "/",
             "/management/app/admin",
             "/management/app/ping",
             "/users/login",
             "/users/register",
             "/users/loginForConsent",
+            "/users/multilevel",
             "/data-test/upload-mockbank-data",
             "/data-test/db-flush",
             "/staff-access/users/register",
             "/staff-access/users/login",
-            "/password"
+            "/staff-access/users/admin/authorize/user",
+            "/staff-access/data/branch",
+            "/password",
+            "/users/validate",
+            "/oauth/**",
+            "/emails/email",
+            "/sca/login"
     };
 
-    public static final String[] CONSOLE_WHITELIST = {
+    protected static final String[] CONSOLE_WHITELIST = {
             "/console/**"
     };
 
-    private PermittedResources() {}
+    protected static final String[] ACTUATOR_WHITELIST = {
+            "/actuator/info",
+            "/actuator/health"
+    };
+
+    private PermittedResources() {
+    }
 }

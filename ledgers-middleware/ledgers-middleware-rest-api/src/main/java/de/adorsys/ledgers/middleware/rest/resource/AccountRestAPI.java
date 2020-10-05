@@ -16,21 +16,18 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
-import de.adorsys.ledgers.middleware.api.domain.account.AccountBalanceTO;
-import de.adorsys.ledgers.middleware.api.domain.account.AccountDetailsTO;
-import de.adorsys.ledgers.middleware.api.domain.account.FundsConfirmationRequestTO;
-import de.adorsys.ledgers.middleware.api.domain.account.TransactionTO;
+import de.adorsys.ledgers.middleware.api.domain.account.*;
 import de.adorsys.ledgers.middleware.api.domain.payment.AmountTO;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
 import io.swagger.annotations.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
 
-@Api(tags = "LDG002 - Accounts", description = "Provides access to a deposit account. This interface does not provide any endpoint to list all accounts.")
+@Api(tags = "LDG003 - Accounts", description = "Provides access to a deposit account. This interface does not provide any endpoint to list all accounts.")
 public interface AccountRestAPI {
     String BASE_PATH = "/accounts";
     String IBAN_QUERY_PARAM = "iban";
@@ -39,8 +36,8 @@ public interface AccountRestAPI {
     String DATE_FROM_QUERY_PARAM = "dateFrom";
     String ACCOUNT_ID = "accountId";
     String TRANSACTION_ID = "transactionId";
-    String THE_ID_OF_THE_DEPOSIT_ACCOUNT_CANNOT_BE_EMPTY = "The id of the deposit account. Cannot be empty.";
-    String THE_ID_OF_THE_TRANSACTION_CANNOT_BE_EMPTY = "The id of the transaction. Cannot be empty.";
+    String PAGE = "page";
+    String SIZE = "size";
 
     /**
      * Return the list of accounts linked with the current customer.
@@ -69,7 +66,7 @@ public interface AccountRestAPI {
                             + "</ul>",
             authorizations = @Authorization(value = "apiKey"))
     @ApiResponses(value = {
-            @ApiResponse(code = 200, response = Void.class, message = "Account creation successful. Still planing to work with 201 here."),
+            @ApiResponse(code = 200, message = "Account creation successful. Still planing to work with 201 here."),
             @ApiResponse(code = 409, message = "Account with given IBAN already exists.")
     })
     ResponseEntity<Void> createDepositAccount(@RequestBody AccountDetailsTO accountDetailsTO);
@@ -100,8 +97,19 @@ public interface AccountRestAPI {
     ResponseEntity<List<TransactionTO>> getTransactionByDates(
             @ApiParam(ACCOUNT_ID)
             @PathVariable(name = "accountId") String accountId,
-            @RequestParam(name = DATE_FROM_QUERY_PARAM) @Nullable @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateFrom,
-            @RequestParam(name = DATE_TO_QUERY_PARAM) @Nullable @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateTo);
+            @RequestParam(name = DATE_FROM_QUERY_PARAM, required = false) @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateFrom,
+            @RequestParam(name = DATE_TO_QUERY_PARAM) @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateTo);
+
+    @GetMapping(path = "/{accountId}/transactions/page", params = {DATE_FROM_QUERY_PARAM, DATE_TO_QUERY_PARAM, PAGE, SIZE})
+    @ApiOperation(value = "Find Transactions By Date", notes = "Returns transactions for the given account id for certain dates, paged view",
+            authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<CustomPageImpl<TransactionTO>> getTransactionByDatesPaged(
+            @ApiParam(ACCOUNT_ID)
+            @PathVariable(name = "accountId") String accountId,
+            @RequestParam(name = DATE_FROM_QUERY_PARAM, required = false) @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateFrom,
+            @RequestParam(name = DATE_TO_QUERY_PARAM) @DateTimeFormat(pattern = LOCAL_DATE_YYYY_MM_DD_FORMAT) LocalDate dateTo,
+            @RequestParam(PAGE) int page,
+            @RequestParam(SIZE) int size);
 
     @GetMapping("/{accountId}/transactions/{transactionId}")
     @ApiOperation(value = "Load Transaction", notes = "Returns the transaction with the given account id and transaction id.",
@@ -131,4 +139,12 @@ public interface AccountRestAPI {
     @PostMapping("/{accountId}/cash")
     @ApiOperation(value = "Deposit Cash", authorizations = @Authorization(value = "apiKey"), notes = "Only technical users are authorized to perform this operation")
     ResponseEntity<Void> depositCash(@PathVariable(name = "accountId") String accountId, @RequestBody AmountTO amount);
+
+    @GetMapping(path = "/info/{accountIdentifierType}/{accountIdentifier}")
+    @ApiOperation(value = "Load Account Owner Additional information", authorizations = @Authorization(value = "apiKey"), notes = "Returns Additional Account Information by Account Identifier")
+    ResponseEntity<List<AdditionalAccountInformationTO>> getAdditionalAccountInfo(
+            @ApiParam(value = "Account identifier type i.e. ACCOUNT_ID / IBAN")
+            @PathVariable(name = "accountIdentifierType") AccountIdentifierTypeTO accountIdentifierType,
+            @ApiParam(value = "The IBAN of the requested account: e.g.: DE69760700240340283600", example = "DE69760700240340283600")
+            @PathVariable(name = "accountIdentifier") String accountIdentifier);
 }

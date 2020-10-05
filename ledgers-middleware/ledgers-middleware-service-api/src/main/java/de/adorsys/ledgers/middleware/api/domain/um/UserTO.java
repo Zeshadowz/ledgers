@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,14 +29,18 @@ public class UserTO {
 
     private String branch;
 
-    @JsonIgnore
-    public boolean userHasRoles() {
-        return CollectionUtils.isEmpty(userRoles);
+    private boolean blocked;
+    private boolean systemBlocked;
+
+    public UserTO(String login, String email, String pin) {
+        this.login = login;
+        this.email = email;
+        this.pin = pin;
     }
 
-    public UserTO(String login, String email, String pin){
-        this.login=login;
-        this.email=email;
-        this.pin=pin;
+    @JsonIgnore
+    public UserTO updateUserBranch(String newBranch) {
+        this.branch = newBranch;
+        return this;
     }
 }

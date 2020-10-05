@@ -17,35 +17,37 @@
 package de.adorsys.ledgers.um.impl.service;
 
 import de.adorsys.ledgers.um.api.domain.*;
-import de.adorsys.ledgers.um.api.exception.UserManagementModuleException;
+import de.adorsys.ledgers.um.api.service.ScaUserDataService;
 import de.adorsys.ledgers.um.api.service.UserService;
-import de.adorsys.ledgers.um.db.domain.AccountAccess;
-import de.adorsys.ledgers.um.db.domain.AisConsentEntity;
-import de.adorsys.ledgers.um.db.domain.ScaUserDataEntity;
-import de.adorsys.ledgers.um.db.domain.UserEntity;
+import de.adorsys.ledgers.um.db.domain.*;
 import de.adorsys.ledgers.um.db.repository.AisConsentRepository;
 import de.adorsys.ledgers.um.db.repository.UserRepository;
 import de.adorsys.ledgers.um.impl.converter.AisConsentMapper;
 import de.adorsys.ledgers.um.impl.converter.UserConverter;
 import de.adorsys.ledgers.util.Ids;
 import de.adorsys.ledgers.util.PasswordEnc;
+import de.adorsys.ledgers.util.exception.UserManagementModuleException;
 import de.adorsys.ledgers.util.tan.encriptor.TanEncryptor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
-import static de.adorsys.ledgers.um.api.exception.UserManagementErrorCode.*;
+import static de.adorsys.ledgers.util.exception.UserManagementErrorCode.*;
+import static de.adorsys.ledgers.util.exception.UserManagementModuleException.getModuleExceptionSupplier;
 
 @Slf4j
 @Service
 @Transactional
+@SuppressWarnings("PMD.TooManyMethods")
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private static final String USER_WITH_LOGIN_NOT_FOUND = "User with login=%s not found";
@@ -53,6 +55,7 @@ public class UserServiceImpl implements UserService {
     private static final String CONSENT_WITH_ID_S_NOT_FOUND = "Consent with id=%s not found";
 
     private final UserRepository userRepository;
+    private final ScaUserDataService scaUserDataService;
     private final AisConsentRepository consentRepository;
     private final UserConverter userConverter;
     private final PasswordEnc passwordEnc;
@@ -63,18 +66,18 @@ public class UserServiceImpl implements UserService {
     public UserBO create(UserBO user) {
         checkUserAlreadyExists(user);
 
+        checkDuplicateScaMethods(user.getScaUserData());
         UserEntity userEntity = userConverter.toUserPO(user);
 
         // if user is TPP and has an ID than do not reset it
         if (userEntity.getId() == null) {
-            log.info("User with login {} has no id, generating one", userEntity.getLogin());
             userEntity.setId(Ids.id());
         }
 
         userEntity.setPin(passwordEnc.encode(userEntity.getId(), user.getPin()));
         hashStaticTan(userEntity);
-
-        return userConverter.toUserBO(userRepository.save(userEntity));
+        UserEntity save = userRepository.save(userEntity);
+        return convertToUserBoAndDecodeTan(save);
     }
 
     @Override
@@ -85,12 +88,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserBO findById(String id) {
-        UserEntity userPO = userRepository.findById(id)
-                                    .orElseThrow(() -> UserManagementModuleException.builder()
-                                                               .errorCode(USER_NOT_FOUND)
-                                                               .devMsg(String.format(USER_WITH_ID_NOT_FOUND, id))
-                                                               .build());
-        return userConverter.toUserBO(userPO);
+        UserEntity user = userRepository.findById(id)
+                                  .orElseThrow(getModuleExceptionSupplier(id, USER_NOT_FOUND, USER_WITH_ID_NOT_FOUND));
+        return convertToUserBoAndDecodeTan(user);
     }
 
     @Override
@@ -99,14 +99,20 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UserBO findByLoginOrEmail(String loginOrEmail) {
+        return userRepository.findByLoginOrEmail(loginOrEmail)
+                       .map(userConverter::toUserBO)
+                       .orElseThrow(getModuleExceptionSupplier(loginOrEmail, USER_NOT_FOUND, USER_WITH_LOGIN_NOT_FOUND));
+    }
+
+    @Override
     public UserBO updateScaData(List<ScaUserDataBO> scaDataList, String userLogin) {
         log.info("Retrieving user by login={}", userLogin);
         UserEntity user = userRepository.findFirstByLogin(userLogin)
-                                  .orElseThrow(() -> UserManagementModuleException.builder()
-                                                             .errorCode(USER_NOT_FOUND)
-                                                             .devMsg(String.format(USER_WITH_LOGIN_NOT_FOUND, userLogin))
-                                                             .build());
+                                  .orElseThrow(getModuleExceptionSupplier(userLogin, USER_NOT_FOUND, USER_WITH_LOGIN_NOT_FOUND));
 
+        checkDuplicateScaMethods(scaDataList);
+        scaUserDataService.ifScaChangedEmailNotValid(userConverter.toUserBO(user).getScaUserData(), scaDataList);
         List<ScaUserDataEntity> scaMethods = userConverter.toScaUserDataListEntity(scaDataList);
         user.getScaUserData().clear();
         user.getScaUserData().addAll(scaMethods);
@@ -114,17 +120,14 @@ public class UserServiceImpl implements UserService {
 
         log.info("{} sca methods would be updated", scaMethods.size());
         UserEntity save = userRepository.save(user);
-        return userConverter.toUserBO(save);
+        return convertToUserBoAndDecodeTan(save);
     }
 
     @Override
     public UserBO updateAccountAccess(String userLogin, List<AccountAccessBO> accountAccessListBO) {
         log.info("Retrieving user by login={}", userLogin);
         UserEntity user = userRepository.findFirstByLogin(userLogin)
-                                  .orElseThrow(() -> UserManagementModuleException.builder()
-                                                             .errorCode(USER_NOT_FOUND)
-                                                             .devMsg(String.format(USER_WITH_LOGIN_NOT_FOUND, userLogin))
-                                                             .build());
+                                  .orElseThrow(getModuleExceptionSupplier(userLogin, USER_NOT_FOUND, USER_WITH_LOGIN_NOT_FOUND));
 
         List<AccountAccess> accountAccesses = userConverter.toAccountAccessListEntity(accountAccessListBO);
         user.getAccountAccesses().clear();
@@ -132,7 +135,7 @@ public class UserServiceImpl implements UserService {
 
         log.info("{} account accesses would be updated", accountAccesses.size());
         UserEntity save = userRepository.save(user);
-        return userConverter.toUserBO(save);
+        return convertToUserBoAndDecodeTan(save);
     }
 
     @Override
@@ -144,17 +147,35 @@ public class UserServiceImpl implements UserService {
     @Override
     public AisConsentBO loadConsent(String consentId) {
         AisConsentEntity aisConsentEntity = consentRepository.findById(consentId)
-                                                    .orElseThrow(() -> UserManagementModuleException.builder()
-                                                                               .errorCode(CONSENT_NOT_FOUND)
-                                                                               .devMsg(String.format(CONSENT_WITH_ID_S_NOT_FOUND, consentId))
-                                                                               .build());
+                                                    .orElseThrow(getModuleExceptionSupplier(consentId, CONSENT_NOT_FOUND, CONSENT_WITH_ID_S_NOT_FOUND));
         return aisConsentMapper.toAisConsentBO(aisConsentEntity);
     }
 
     @Override
-    public List<UserBO> findByBranchAndUserRolesIn(String branch, List<UserRoleBO> userRoles) {
-        List<UserEntity> userEntities = userRepository.findByBranchAndUserRolesIn(branch, userConverter.toUserRole(userRoles));
-        return userConverter.toUserBOList(userEntities);
+    public Page<UserExtendedBO> findUsersByMultipleParamsPaged(String countryCode, String branchId, String branchLogin, String userLogin, List<UserRoleBO> roles, Boolean blocked, Pageable pageable) {
+        List<Boolean> blockedQueryParam = Optional.ofNullable(blocked)
+                                                  .map(Arrays::asList)
+                                                  .orElseGet(() -> Arrays.asList(true, false));
+        Map<String, String> branchIds = findBranchIdsByMultipleParameters(countryCode, branchId, branchLogin);
+        Page<UserExtendedBO> users = userRepository.findByBranchInAndLoginContainingAndUserRolesInAndBlockedInAndSystemBlockedFalse(branchIds.keySet(), userLogin, userConverter.toUserRole(roles), blockedQueryParam, pageable)
+                                             .map(u -> userConverter.toUserExtendedBO(u, branchIds.get(u.getBranch())));
+        users.forEach(this::decodeStaticTanForUser);
+        return users;
+    }
+
+    @Override
+    public Map<String, String> findBranchIdsByMultipleParameters(String countryCode, String branchId, String branchLogin) {
+        return userConverter.toUserBOList(userRepository.findBranchIdsByMultipleParameters(countryCode, branchId, branchLogin, UserRole.STAFF)).stream()
+                       .collect(Collectors.toMap(UserBO::getId, UserBO::getLogin));
+    }
+
+    @Override
+    public List<String> findUserLoginsByBranch(String branchId) {
+        List<UserEntity> logins = userRepository.findByBranch(branchId);
+
+        return logins.stream()
+                       .map(UserEntity::getLogin)
+                       .collect(Collectors.toList());
     }
 
     @Override
@@ -162,19 +183,129 @@ public class UserServiceImpl implements UserService {
         return userRepository.countByBranch(branch);
     }
 
-    private void hashStaticTan(UserEntity userEntity) {
-        userEntity.getScaUserData().stream()
-                .filter(d -> StringUtils.isNotBlank(d.getStaticTan()))
-                .forEach(d -> d.setStaticTan(tanEncryptor.encryptTan(d.getStaticTan())));
+    @Override
+    public UserBO updateUser(UserBO userBO) {
+        checkDuplicateScaMethods(userBO.getScaUserData());
+        checkAndResetValidityScaEmail(userBO);
+        UserEntity user = userConverter.toUserPO(userBO);
+        checkIfPasswordModifiedAndEncode(user);
+        hashStaticTan(user);
+        UserEntity save = userRepository.save(user);
+        return convertToUserBoAndDecodeTan(save);
+    }
+
+    @Override
+    public List<UserBO> findUsersByIban(String iban) {
+        List<UserBO> users = userConverter.toUserBOList(userRepository.findUsersByIban(iban));
+        users.forEach(u -> u.setAccountAccesses(u.getAccountAccesses().stream()
+                                                        .filter(accountAccess -> accountAccess.getIban().equals(iban))
+                                                        .collect(Collectors.toList())));
+        return users;
+    }
+
+    @Override
+    public List<UserBO> findOwnersByIban(String iban) {
+        List<UserBO> users = userConverter.toUserBOList(userRepository.findOwnersByIban(iban, AccessType.OWNER));
+        users.forEach(u -> u.setAccountAccesses(u.getAccountAccesses().stream()
+                                                        .filter(accountAccess -> accountAccess.getIban().equals(iban))
+                                                        .collect(Collectors.toList())));
+        return users;
+    }
+
+    @Override
+    public List<UserBO> findOwnersByAccountId(String accountId) {
+        List<UserBO> users = userConverter.toUserBOList(userRepository.findOwnersByAccountId(accountId, AccessType.OWNER));
+        users.forEach(u -> u.setAccountAccesses(u.getAccountAccesses().stream()
+                                                        .filter(accountAccess -> accountAccess.getAccountId().equals(accountId))
+                                                        .collect(Collectors.toList())));
+        return users;
+    }
+
+    @Override
+    public void updatePassword(String userId, String password) {
+        UserEntity user = userRepository.findById(userId)
+                                  .orElseThrow(getModuleExceptionSupplier(userId, USER_NOT_FOUND, USER_WITH_ID_NOT_FOUND));
+        user.setPin(passwordEnc.encode(userId, password));
+        userRepository.save(user);
+    }
+
+    @Override
+    public void setBranchBlockedStatus(String userId, boolean isSystemBlock, boolean statusToSet) {
+        if (isSystemBlock) {
+            userRepository.updateSystemBlockedStatus(userId, statusToSet);
+        } else {
+            userRepository.updateBlockedStatus(userId, statusToSet);
+        }
+    }
+
+    @Override
+    public boolean isPresentBranchCode(String bban) {
+        return userRepository.existsById(bban);
+    }
+
+    @Override
+    public Page<UserBO> getUsersByRoles(List<UserRoleBO> roles, Pageable pageable) {
+        return userRepository.findByUserRolesIn(userConverter.toUserRole(roles), pageable)
+                       .map(userConverter::toUserBO);
+    }
+
+    @Override
+    public void setUserBlockedStatus(String userId, boolean isSystemBlock, boolean statusToSet) {
+        if (isSystemBlock) {
+            userRepository.updateUserSystemBlockedStatus(userId, statusToSet);
+        } else {
+            userRepository.updateUserBlockedStatus(userId, statusToSet);
+        }
+    }
+
+    private void checkDuplicateScaMethods(List<ScaUserDataBO> scaUserData) {
+        List<ScaUserDataBO> checkedData = Optional.ofNullable(scaUserData).orElse(Collections.emptyList());
+        if (new HashSet<>(checkedData).size() != checkedData.size()) {
+            throw UserManagementModuleException.builder()
+                          .devMsg("Duplicating Sca Methods is forbidden!")
+                          .errorCode(DUPLICATE_SCA)
+                          .build();
+        }
+    }
+
+    private void checkIfPasswordModifiedAndEncode(UserEntity user) {
+        String oldPin = findById(user.getId()).getPin();
+        if (!user.getPin().equals(oldPin)) {
+            user.setPin(passwordEnc.encode(user.getId(), user.getPin()));
+        }
+    }
+
+    private void checkAndResetValidityScaEmail(UserBO user) {
+        scaUserDataService.ifScaChangedEmailNotValid(findById(user.getId()).getScaUserData(), user.getScaUserData());
     }
 
     @NotNull
     public UserEntity getUser(String login) {
         return userRepository.findFirstByLogin(login)
-                       .orElseThrow(() -> UserManagementModuleException.builder()
-                                                  .errorCode(USER_NOT_FOUND)
-                                                  .devMsg(String.format(USER_WITH_LOGIN_NOT_FOUND, login))
-                                                  .build());
+                       .orElseThrow(getModuleExceptionSupplier(login, USER_NOT_FOUND, USER_WITH_LOGIN_NOT_FOUND));
+    }
+
+    private UserBO convertToUserBoAndDecodeTan(UserEntity user) {
+        UserBO userBO = userConverter.toUserBO(user);
+        decodeStaticTanForUser(userBO);
+        return userBO;
+    }
+
+    private <T extends UserBO> void decodeStaticTanForUser(T user) {
+        Optional.ofNullable(user.getScaUserData())
+                .ifPresent(d -> d.forEach(this::decodeStaticTan));
+    }
+
+    private void decodeStaticTan(ScaUserDataBO scaUserData) {
+        if (scaUserData.isUsesStaticTan() && StringUtils.isNotBlank(scaUserData.getStaticTan())) {
+            scaUserData.setStaticTan(tanEncryptor.decryptTan(scaUserData.getStaticTan()));
+        }
+    }
+
+    private void hashStaticTan(UserEntity userEntity) {
+        userEntity.getScaUserData().stream()
+                .filter(d -> StringUtils.isNotBlank(d.getStaticTan()))
+                .forEach(d -> d.setStaticTan(tanEncryptor.encryptTan(d.getStaticTan())));
     }
 
     private void checkUserAlreadyExists(UserBO userBO) {

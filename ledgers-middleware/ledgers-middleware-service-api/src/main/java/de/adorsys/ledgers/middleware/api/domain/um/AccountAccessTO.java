@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Currency;
 import java.util.EnumSet;
 
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
@@ -18,9 +19,13 @@ public class AccountAccessTO {
     @NotNull
     private String iban;
     @NotNull
+    private Currency currency;
+    @NotNull
     private AccessTypeTO accessType;
     @NotNull
     private int scaWeight;
+    @NotNull
+    private String accountId;
 
     @JsonIgnore
     public boolean hasPaymentAccess(String requestedIban) {

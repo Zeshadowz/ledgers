@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,10 @@ public class SCAUtils {
                        .filter(uda -> scaMethodId.equals(uda.getId()))
                        .findFirst()
                        .orElse(null);
+    }
+
+    public ScaUserDataTO getScaMethod(UserBO user, String scaMethodId) {
+        return getScaMethod(userMapper.toUserTO(user), scaMethodId);
     }
 
     public UserTO user(String userId) {
@@ -54,7 +60,7 @@ public class SCAUtils {
     public String authorisationId(ScaInfoTO scaInfoTO) {
         String scaId = scaInfoTO.getScaId();
         String authorisationId = scaInfoTO.getAuthorisationId();
-        if (authorisationId.equals(scaId)) {// we are working with login token.
+        if (Objects.equals(authorisationId, scaId)) {// we are working with login token.
             authorisationId = Ids.id();
         }
         return authorisationId;

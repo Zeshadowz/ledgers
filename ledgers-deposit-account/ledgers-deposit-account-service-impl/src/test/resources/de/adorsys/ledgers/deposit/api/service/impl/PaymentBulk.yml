@@ -2,11 +2,13 @@ paymentId: myPaymentId
 batchBookingPreferred: false
 requestedExecutionDate: 2018-12-12
 paymentType: BULK
+paymentProduct: "sepa-credit-transfers"
 startDate:
 endDate:
 executionRule:
 frequency:
 dayOfExecution:
+accountId: "accountId"
 debtorAccount:
   {
     iban: DE91100000000123456789,
@@ -46,7 +48,6 @@ targets:
           country: Ukraine
       },
       remittanceInformationUnstructured: remittance,
-      paymentProduct: SEPA,
       payment:
   }
   - {
@@ -77,6 +78,5 @@ targets:
             country: Ukraine
         },
         remittanceInformationUnstructured: remittance,
-        paymentProduct: CROSS_BORDER,
         payment:
     }

@@ -1,10 +1,12 @@
 package de.adorsys.ledgers.middleware.api.service;
 
+import de.adorsys.ledgers.middleware.api.domain.account.AccountIdentifierTypeTO;
+import de.adorsys.ledgers.middleware.api.domain.account.AccountReferenceTO;
+import de.adorsys.ledgers.middleware.api.domain.account.AdditionalAccountInformationTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.ScaInfoTO;
-import de.adorsys.ledgers.middleware.api.domain.um.AccountAccessTO;
-import de.adorsys.ledgers.middleware.api.domain.um.ScaUserDataTO;
-import de.adorsys.ledgers.middleware.api.domain.um.UserRoleTO;
-import de.adorsys.ledgers.middleware.api.domain.um.UserTO;
+import de.adorsys.ledgers.middleware.api.domain.um.*;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
+import de.adorsys.ledgers.util.domain.CustomPageableImpl;
 
 import java.util.List;
 
@@ -63,10 +65,30 @@ public interface MiddlewareUserManagementService {
     /**
      * Loads list of users by branch and role
      *
-     * @param roles user roles
+     * @param countryCode Country Code
+     * @param roles       user roles
      * @return list of users by branch and role
      */
-    List<UserTO> getUsersByBranchAndRoles(String branch, List<UserRoleTO> roles);
+    CustomPageImpl<UserTO> getUsersByBranchAndRoles(String countryCode, String branchId, String branchLogin, String userLogin, List<UserRoleTO> roles, Boolean blocked, CustomPageableImpl pageable);
+
+    /**
+     * Returns list of logins for users (role = CUSTOMER) within the given branch.
+     *
+     * @param branch branch ID.
+     * @return list of logins.
+     */
+    List<String> getBranchUserLogins(String branch);
+
+    CustomPageImpl<UserTO> getUsersByRoles(List<UserRoleTO> roles, CustomPageableImpl pageable);
+
+    /**
+     * Loads list of users by branch and role
+     *
+     * @param countryCode Country Code
+     * @param roles       user roles
+     * @return list of users by branch and role
+     */
+    CustomPageImpl<UserExtendedTO> getUsersByBranchAndRolesExtended(String countryCode, String branchId, String branchLogin, String userLogin, List<UserRoleTO> roles, Boolean blocked, CustomPageableImpl pageable);
 
     /**
      * Counts users by branch
@@ -75,4 +97,20 @@ public interface MiddlewareUserManagementService {
      * @return amount of users
      */
     int countUsersByBranch(String branch);
+
+    UserTO updateUser(String branchId, UserTO user);
+
+    void updatePassword(String userId, String password);
+
+    boolean checkMultilevelScaRequired(String login, String iban);
+
+    boolean checkMultilevelScaRequired(String login, List<AccountReferenceTO> references);
+
+    List<AdditionalAccountInformationTO> getAdditionalInformation(ScaInfoTO scaInfoHolder, AccountIdentifierTypeTO accountIdentifierType, String accountIdentifier);
+
+    boolean changeStatus(String userId, boolean systemBlock);
+
+    void editBasicSelf(String userId, UserTO user);
+
+    void revertDatabase(String userId, long recoveryPointId);
 }

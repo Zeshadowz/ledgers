@@ -16,15 +16,15 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
-import de.adorsys.ledgers.middleware.api.domain.account.AccountBalanceTO;
-import de.adorsys.ledgers.middleware.api.domain.account.AccountDetailsTO;
-import de.adorsys.ledgers.middleware.api.domain.account.FundsConfirmationRequestTO;
-import de.adorsys.ledgers.middleware.api.domain.account.TransactionTO;
+import de.adorsys.ledgers.middleware.api.domain.account.*;
 import de.adorsys.ledgers.middleware.api.domain.payment.AmountTO;
 import de.adorsys.ledgers.middleware.api.exception.MiddlewareModuleException;
 import de.adorsys.ledgers.middleware.api.service.MiddlewareAccountManagementService;
+import de.adorsys.ledgers.middleware.api.service.MiddlewareUserManagementService;
 import de.adorsys.ledgers.middleware.rest.annotation.MiddlewareUserResource;
 import de.adorsys.ledgers.middleware.rest.security.ScaInfoHolder;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
+import de.adorsys.ledgers.util.domain.CustomPageableImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -49,6 +49,7 @@ import static de.adorsys.ledgers.middleware.api.exception.MiddlewareErrorCode.RE
 public class AccountResource implements AccountRestAPI {
     private final ScaInfoHolder scaInfoHolder;
     private final MiddlewareAccountManagementService middlewareAccountService;
+    private final MiddlewareUserManagementService userManagementService;
 
 
     /**
@@ -57,7 +58,7 @@ public class AccountResource implements AccountRestAPI {
      * @return : the list of accounts linked with the current customer.
      */
     @Override
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','SYSTEM')")
     public ResponseEntity<List<AccountDetailsTO>> getListOfAccounts() {
         return ResponseEntity.ok(middlewareAccountService.listDepositAccounts(scaInfoHolder.getUserId()));
     }
@@ -67,7 +68,7 @@ public class AccountResource implements AccountRestAPI {
     public ResponseEntity<Void> createDepositAccount(AccountDetailsTO accountDetailsTO) {
         // create account. It does not exist.
         String iban = accountDetailsTO.getIban();
-        // Splitt in prefix and suffix
+        // Split in prefix and suffix
         String accountNumberPrefix = StringUtils.substring(iban, 0, iban.length() - 2);
         String accountNumberSuffix = StringUtils.substringAfter(iban, accountNumberPrefix);
 
@@ -99,6 +100,15 @@ public class AccountResource implements AccountRestAPI {
 
     @Override
     @PreAuthorize("accountInfoById(#accountId)")
+    public ResponseEntity<CustomPageImpl<TransactionTO>> getTransactionByDatesPaged(String accountId, LocalDate dateFrom, LocalDate dateTo, int page, int size) {
+        dateChecker(dateFrom, dateTo);
+        CustomPageableImpl pageable = new CustomPageableImpl(page, size);
+        CustomPageImpl<TransactionTO> customPage = middlewareAccountService.getTransactionsByDatesPaged(accountId, dateFrom, dateTo, pageable);
+        return ResponseEntity.ok(customPage);
+    }
+
+    @Override
+    @PreAuthorize("accountInfoById(#accountId)")
     public ResponseEntity<TransactionTO> getTransactionById(String accountId, String transactionId) {
         return ResponseEntity.ok(middlewareAccountService.getTransactionById(accountId, transactionId));
     }
@@ -117,7 +127,7 @@ public class AccountResource implements AccountRestAPI {
     @Override
     @PreAuthorize("accountInfoByIban(#request.psuAccount.iban)")
     public ResponseEntity<Boolean> fundsConfirmation(FundsConfirmationRequestTO request) {
-        if (request.getInstructedAmount().getAmount().compareTo(BigDecimal.ZERO) != 1) {
+        if (request.getInstructedAmount().getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw MiddlewareModuleException.builder()
                           .errorCode(REQUEST_VALIDATION_FAILURE)
                           .devMsg("Requested amount less or equal zero")
@@ -132,6 +142,12 @@ public class AccountResource implements AccountRestAPI {
     public ResponseEntity<Void> depositCash(String accountId, AmountTO amount) {
         middlewareAccountService.depositCash(scaInfoHolder.getScaInfo(), accountId, amount);
         return ResponseEntity.accepted().build();
+    }
+
+    @Override
+    @PreAuthorize("accountInfoByIdentifier(#accountIdentifierType, #accountIdentifier)")
+    public ResponseEntity<List<AdditionalAccountInformationTO>> getAdditionalAccountInfo(AccountIdentifierTypeTO accountIdentifierType, String accountIdentifier) {
+        return ResponseEntity.ok(userManagementService.getAdditionalInformation(scaInfoHolder.getScaInfo(), accountIdentifierType, accountIdentifier));
     }
 
     private void dateChecker(LocalDate dateFrom, LocalDate dateTo) {

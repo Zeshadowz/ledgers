@@ -8,18 +8,18 @@ import de.adorsys.ledgers.middleware.api.domain.account.UsageTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCALoginResponseTO;
 import de.adorsys.ledgers.middleware.api.domain.um.*;
 import de.adorsys.ledgers.middleware.client.rest.*;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
+import de.adorsys.ledgers.util.domain.CustomPageImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.math.BigInteger;
 import java.util.Collections;
@@ -29,14 +29,16 @@ import java.util.Optional;
 
 import static de.adorsys.ledgers.middleware.api.domain.um.AccessTypeTO.OWNER;
 import static de.adorsys.ledgers.middleware.api.domain.um.UserRoleTO.CUSTOMER;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.http.HttpStatus.OK;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+
+@ExtendWith(SpringExtension.class)
 @SpringBootTest(classes = LedgersClientApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("h2")
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class LedgersClientIT {
+@TestMethodOrder(MethodOrderer.Alphanumeric.class)
+class LedgersClientIT {
+
     @Autowired
     private AccountRestClient accountRestClient;
     @Autowired
@@ -57,27 +59,32 @@ public class LedgersClientIT {
     private static final String BANK_CODE = "76070024";
 
     private static final UserTO BRANCH = getUser(BRANCH_LOGIN, UserRoleTO.STAFF);
-    private static UserTO USER_1 = getUser("1", CUSTOMER);
-    private static UserTO USER_2 = getUser("2", CUSTOMER);
+    private static UserTO USER_1 = getUser("01", CUSTOMER);
+    private static UserTO USER_2 = getUser("02", CUSTOMER);
     private static AccountDetailsTO ACCOUNT_1 = getAccountDetails(USER_1.getLogin());
     private static AccountDetailsTO ACCOUNT_2 = getAccountDetails(USER_2.getLogin());
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         depositAccountInitService.initConfigData();
     }
 
     @Test
-    public void a_createAdmin() {
+    void a_createAdmin() {
+        // Given
         UserTO adminUser = new UserTO("admin", "admin@ledgers.ldg", "12345");
+
+        // When
         ResponseEntity<BearerTokenTO> response = appMgmtRestClient.admin(adminUser);
-        assertThat(response.getStatusCode()).isEqualTo(OK);
-        assertThat(response.getBody().getAccess_token()).isNotBlank();
+
+        // Then
+        assertEquals(OK, response.getStatusCode());
+        assertFalse(response.getBody().getAccess_token().isEmpty());
     }
 
     @Test
-    public void b_createUserAndAccount() {
-        ResponseEntity<UserTO> user = userMgmtRestClient.register("francis.pouatcha", "fpo@mail.ledgers", "12345", CUSTOMER);
+    void b_createUserAndAccount() {
+        userMgmtRestClient.register("francis.pouatcha", "fpo@mail.ledgers", "12345", CUSTOMER);
         AccountDetailsTO a = new AccountDetailsTO();
         a.setIban("DE69760700240340283600");
         a.setAccountStatus(AccountStatusTO.ENABLED);
@@ -93,59 +100,73 @@ public class LedgersClientIT {
 
         authHeader.setAccessToken(token.getAccess_token());
         ResponseEntity<Void> createDepositAccountResponse = accountRestClient.createDepositAccount(a);
-        Assert.assertTrue(OK.equals(createDepositAccountResponse.getStatusCode()));
+        assertEquals(OK, createDepositAccountResponse.getStatusCode());
         authHeader.setAccessToken(null);
     }
 
     @Test
-    public void c_createBranch() {
+    void c_createBranch() {
+        // When
         ResponseEntity<UserTO> responseBranchCreation = userMgmtStaffRestClient.register(BRANCH_LOGIN, BRANCH);
-        assertThat(responseBranchCreation.getStatusCode()).isEqualTo(OK);
-        assertThat(responseBranchCreation.getBody().getId()).isNotBlank();
+
+        // Then
+        assertEquals(OK, responseBranchCreation.getStatusCode());
+        assertFalse(responseBranchCreation.getBody().getId().isEmpty());
     }
 
     @Test
-    public void d_loginAsBranch() {
+    void d_loginAsBranch() {
+        // When
         ResponseEntity<SCALoginResponseTO> branchLogin = userMgmtStaffRestClient.login(new UserCredentialsTO(BRANCH.getLogin(), PIN, UserRoleTO.STAFF));
-        assertThat(branchLogin.getStatusCode()).isEqualTo(OK);
+        assertEquals(OK, branchLogin.getStatusCode());
         authHeader.setAccessToken(branchLogin.getBody().getBearerToken().getAccess_token());
     }
 
     @Test
-    public void e_createTwoUsersAsBranch() {
+    void e_createTwoUsersAsBranch() {
+        // When
         ResponseEntity<UserTO> user1Response = userMgmtStaffRestClient.createUser(USER_1);
         ResponseEntity<UserTO> user2Response = userMgmtStaffRestClient.createUser(USER_2);
-        assertThat(user1Response.getStatusCode()).isEqualTo(OK);
-        assertThat(user2Response.getStatusCode()).isEqualTo(OK);
+        assertEquals(OK, user1Response.getStatusCode());
+        assertEquals(OK, user2Response.getStatusCode());
 
         USER_1 = user1Response.getBody();
         USER_2 = user2Response.getBody();
-        assertThat(USER_1.getId()).isNotBlank();
-        assertThat(USER_2.getId()).isNotBlank();
-        assertThat(user1Response.getBody().getUserRoles().contains(CUSTOMER)).isTrue();
-        assertThat(user1Response.getBody().getUserRoles().contains(CUSTOMER)).isTrue();
+
+        // Then
+        assertFalse(USER_1.getId().isEmpty());
+        assertFalse(USER_2.getId().isEmpty());
+        assertTrue(user1Response.getBody().getUserRoles().contains(CUSTOMER));
+        assertTrue(user1Response.getBody().getUserRoles().contains(CUSTOMER));
     }
 
     @Test
-    public void f_createAccountsForUsersAsBranch() {
+    void f_createAccountsForUsersAsBranch() {
+        // Given
         ResponseEntity<Void> accountResponse1 = accountMgmtStaffRestClient.createDepositAccountForUser(USER_1.getId(), ACCOUNT_1);
         ResponseEntity<Void> accountResponse2 = accountMgmtStaffRestClient.createDepositAccountForUser(USER_2.getId(), ACCOUNT_2);
-        assertThat(accountResponse1.getStatusCode()).isEqualTo(OK);
-        assertThat(accountResponse2.getStatusCode()).isEqualTo(OK);
+        assertEquals(OK, accountResponse1.getStatusCode());
+        assertEquals(OK, accountResponse2.getStatusCode());
 
+        // When
         //Check Users Accesses and Branch Accesses are correct
-        ResponseEntity<List<UserTO>> allBranchUsersResponse = userMgmtStaffRestClient.getBranchUsersByRoles(Collections.singletonList(CUSTOMER));
+        ResponseEntity<CustomPageImpl<UserTO>> allBranchUsersResponse = userMgmtStaffRestClient.getBranchUsersByRoles(Collections.singletonList(CUSTOMER), "", false, 0, Integer.MAX_VALUE);
         checkUsersListAccesses(allBranchUsersResponse, OK, 2, 1);
 
         ResponseEntity<UserTO> branchResponse = userMgmtRestClient.getUser();
         checkUserResponse(branchResponse, OK, 2);
+
+        //refresh accounts
+        List<AccountDetailsTO> accounts = accountMgmtStaffRestClient.getListOfAccounts().getBody();
+        ACCOUNT_1 = accounts.get(0);
+        ACCOUNT_2 = accounts.get(1);
     }
 
     @Test
-    public void g_addAccessToAccountOfAnotherUser() {
+    void g_addAccessToAccountOfAnotherUser() {
         //Add user2 access to account of user1
         ResponseEntity<Void> addAccessResponse = userMgmtStaffRestClient.updateAccountAccessForUser(USER_2.getId(), getAccountAccess(ACCOUNT_1, AccessTypeTO.DISPOSE, 30));
-        assertThat(addAccessResponse.getStatusCode()).isEqualTo(OK);
+        assertEquals(OK, addAccessResponse.getStatusCode());
 
         //Check user2 has 2 Accesses
         ResponseEntity<UserTO> user2Response = userMgmtStaffRestClient.getBranchUserById(USER_2.getId());
@@ -153,39 +174,49 @@ public class LedgersClientIT {
     }
 
     @Test
-    public void h_updateAccessOfUser() {
+    void h_updateAccessOfUser() {
+        // Given
         //Update AccountAccess for user2 for account1
         AccountAccessTO modifiedAccess = getAccountAccess(ACCOUNT_1, OWNER, 80);
         ResponseEntity<Void> modifiedAccessResponse = userMgmtStaffRestClient.updateAccountAccessForUser(USER_2.getId(), modifiedAccess);
-        assertThat(modifiedAccessResponse.getStatusCode()).isEqualTo(OK);
+        assertEquals(OK, modifiedAccessResponse.getStatusCode());
 
+        // When
         //Check user2 still has 2 Accesses and access to account1 is modified to the one we set in previous call
         ResponseEntity<UserTO> user2Response = userMgmtStaffRestClient.getBranchUserById(USER_2.getId());
         checkUserResponse(user2Response, OK, 2);
         Optional<AccountAccessTO> accessFromResponse = user2Response.getBody().getAccountAccesses().stream().filter(a -> a.getIban().equals(ACCOUNT_1.getIban())).findFirst();
-        assertThat(accessFromResponse.isPresent()).isTrue();
-        assertThat(accessFromResponse.get()).isEqualToIgnoringGivenFields(modifiedAccess, "id");
+
+        // Then
+        assertTrue(accessFromResponse.isPresent());
+
+        AccountAccessTO actual = accessFromResponse.get();
+        modifiedAccess.setId(actual.getId());
+
+        assertEquals(modifiedAccess, actual);
         authHeader.setAccessToken(null);
     }
 
     private AccountAccessTO getAccountAccess(AccountDetailsTO account, AccessTypeTO accessType, int scaWeight) {
         AccountAccessTO access = new AccountAccessTO();
         access.setIban(account.getIban());
+        access.setCurrency(Currency.getInstance("EUR"));
         access.setAccessType(accessType);
         access.setScaWeight(scaWeight);
+        access.setAccountId(account.getId());
         return access;
     }
 
-    private void checkUsersListAccesses(ResponseEntity<List<UserTO>> allBranchUsersResponse, HttpStatus expectedStatus, int listSize, int qtyAccesses) {
-        assertThat(allBranchUsersResponse.getStatusCode()).isEqualTo(expectedStatus);
-        List<UserTO> usersList = allBranchUsersResponse.getBody();
-        assertThat(usersList.size()).isEqualTo(listSize);
-        assertThat(usersList.stream().allMatch(u -> u.getAccountAccesses().size() == qtyAccesses)).isTrue();
+    private void checkUsersListAccesses(ResponseEntity<CustomPageImpl<UserTO>> allBranchUsersResponse, HttpStatus expectedStatus, int listSize, int qtyAccesses) {
+        assertEquals(expectedStatus, allBranchUsersResponse.getStatusCode());
+        CustomPageImpl<UserTO> usersList = allBranchUsersResponse.getBody();
+        assertEquals(listSize, usersList.getTotalElements());
+        assertTrue(usersList.getContent().stream().allMatch(u -> u.getAccountAccesses().size() == qtyAccesses));
     }
 
     private void checkUserResponse(ResponseEntity<UserTO> response, HttpStatus expectedStatus, int qtyAccesses) {
-        assertThat(response.getStatusCode()).isEqualTo(expectedStatus);
-        assertThat(response.getBody().getAccountAccesses().size()).isEqualTo(qtyAccesses);
+        assertEquals(expectedStatus, response.getStatusCode());
+        assertEquals(qtyAccesses, response.getBody().getAccountAccesses().size());
     }
 
     private static AccountDetailsTO getAccountDetails(String login) {
@@ -202,21 +233,18 @@ public class LedgersClientIT {
 
     private static UserTO getUser(String login, UserRoleTO role) {
         UserTO user = new UserTO(login, login + "@eml.de", PIN);
+        user.setId(login);
         user.setUserRoles(Collections.singletonList(role));
         return user;
     }
 
-
-    private static String generateIban(String singleDigitToEndIban) {
-        if (isDigitsAndSize(singleDigitToEndIban, 1)) {
-            BigInteger totalNr = new BigInteger(BANK_CODE + BRANCH_LOGIN + 0 + singleDigitToEndIban + "131400");
-            String checkSum = String.valueOf(98 - totalNr.remainder(BigInteger.valueOf(97)).intValue());
-            if (checkSum.length() < 2) {
-                checkSum = "0" + checkSum;
-            }
-            return "DE" + checkSum + BANK_CODE + 0 + singleDigitToEndIban;
+    private static String generateIban(String ibanEnding) {
+        if (isDigitsAndSize(BRANCH_LOGIN, 8) && isDigitsAndSize(ibanEnding, 2)) {
+            BigInteger totalNr = new BigInteger(LedgersClientIT.BANK_CODE + BRANCH_LOGIN + ibanEnding + "131400");
+            String checkSum = String.format("%02d", 98 - totalNr.remainder(BigInteger.valueOf(97)).intValue());
+            return "DE" + checkSum + LedgersClientIT.BANK_CODE + BRANCH_LOGIN + ibanEnding;
         }
-        throw new IllegalArgumentException(String.format("Inappropriate data for IBAN creation %s", singleDigitToEndIban));
+        throw new IllegalArgumentException(String.format("Inappropriate data for IBAN creation %s %s", BRANCH_LOGIN, ibanEnding));
     }
 
     private static boolean isDigitsAndSize(String toCheck, int size) {

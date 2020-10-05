@@ -40,4 +40,29 @@
     <!-- add static tan fields to sca_data table-->
     <include file="migration/0011-add_fields_to_sca_data_for_static_tan.xml" relativeToChangelogFile="true"/>
     <include file="migration/0012-create-table-reset-password.xml" relativeToChangelogFile="true" />
+
+    <!-- modify foreign key in payment_target table -->
+    <include file="migration/0013-update-fks-cascade-delete.xml" relativeToChangelogFile="true" />
+
+    <!-- add indexes to tables -->
+    <include file="migration/0014-add-indexes.xml" relativeToChangelogFile="true" />
+
+    <include file="migration/0015-create-table-oauth-code.xml" relativeToChangelogFile="true" />
+    <include file="migration/0016-add-oauth-code-usages-table.xml" relativeToChangelogFile="true" />
+    <include file="migration/0017-fix-sca-weight-to-100.xml" relativeToChangelogFile="true" />
+    <include file="migration/0018-link-DA-to-LA.xml" relativeToChangelogFile="true" />
+    <include file="migration/0019-update-branch-id.xml" relativeToChangelogFile="true" />
+    <include file="migration/0020-update-payment-tables.xml" relativeToChangelogFile="true" />
+    <include file="migration/0021-add-user-type-column-to-users-table.xml" relativeToChangelogFile="true" />
+    <include file="migration/0022-add-column-account-id-to-account-accesses-and-payment-tables.xml" relativeToChangelogFile="true" />
+    <include file="migration/0023-extend-payment-related-tables.xml" relativeToChangelogFile="true" />
+    <include file="migration/0024-create-table-email-verification-and-remove-user-type.xml" relativeToChangelogFile="true" />
+    <include file="migration/0025-rename-column-in-sca-data-table.xml" relativeToChangelogFile="true" />
+    <include file="migration/0026-update-default-users-sca-data-with-static-tan.xml" relativeToChangelogFile="true" />
+    <include file="migration/0027-added-blocks-columns-to-users-table.xml" relativeToChangelogFile="true" />
+    <include file="migration/0028-add-block-account.xml" relativeToChangelogFile="true" />
+    <include file="migration/0029-add-timestamps.xml" relativeToChangelogFile="true" />
+    <include file="migration/0030-set-timestamps.xml" relativeToChangelogFile="true" />
+    <include file="migration/0031-update-admin-email.xml" relativeToChangelogFile="true" />
+    <include file="migration/0032-create-table-recovery-point.xml" relativeToChangelogFile="true" />
 </databaseChangeLog>

@@ -16,6 +16,7 @@
 
 package de.adorsys.ledgers.middleware.rest.resource;
 
+import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.PaymentTypeTO;
 import de.adorsys.ledgers.middleware.api.domain.payment.TransactionStatusTO;
 import de.adorsys.ledgers.middleware.api.domain.sca.SCAPaymentResponseTO;
@@ -23,7 +24,9 @@ import io.swagger.annotations.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Api(tags = "LDG003 - Payment", description = "Provide endpoint for initiating and executing payment.")
+import java.util.List;
+
+@Api(tags = "LDG004 - Payment", description = "Provide endpoint for initiating and executing payment.")
 public interface PaymentRestAPI {
     String BASE_PATH = "/payments";
 
@@ -33,7 +36,11 @@ public interface PaymentRestAPI {
 
     @GetMapping(value = "/{paymentId}")
     @ApiOperation(value = "Load Payment", notes = "Returns the payment", authorizations = @Authorization(value = "apiKey"))
-    ResponseEntity<?> getPaymentById(@PathVariable(name = "paymentId") String paymentId);
+    ResponseEntity<PaymentTO> getPaymentById(@PathVariable(name = "paymentId") String paymentId);
+
+    @GetMapping(value = "/pending/periodic")
+    @ApiOperation(value = "Load Pending Periodic Payments", notes = "Returns a list of pending periodic payment", authorizations = @Authorization(value = "apiKey"))
+    ResponseEntity<List<PaymentTO>> getPendingPeriodicPayments();
 
     @PostMapping(params = "paymentType")
     @ApiOperation(value = "Initiates a Payment", notes = "Initiates a payment", authorizations = @Authorization(value = "apiKey"))
@@ -45,7 +52,18 @@ public interface PaymentRestAPI {
     })
     ResponseEntity<SCAPaymentResponseTO> initiatePayment(
             @RequestParam("paymentType") PaymentTypeTO paymentType,
-            @RequestBody Object payment);
+            @RequestBody PaymentTO payment);
+
+
+    @PostMapping("/execution")
+    @ApiOperation(value = "Executes a Payment", notes = "Executes a payment", authorizations = @Authorization(value = "apiKey"))
+    @ApiResponses(value = {
+            @ApiResponse(code = 200, response = SCAPaymentResponseTO.class, message = "Success. ScaToken contained in the returned response object."),
+            @ApiResponse(code = 404, message = "Specified account not found."),
+            @ApiResponse(code = 403, message = "Not authorized to execute payment on this account"),
+            @ApiResponse(code = 409, message = "Payment with specified paymentId exists.")
+    })
+    ResponseEntity<SCAPaymentResponseTO> executePayment(@RequestBody PaymentTO payment);
 
     @GetMapping(value = "/{paymentId}/authorisations/{authorisationId}")
     @ApiOperation(value = "Get SCA", notes = "Get the authorization response object eventually containing the list of selected sca methods.",
@@ -61,14 +79,14 @@ public interface PaymentRestAPI {
                                                       @PathVariable("scaMethodId") String scaMethodId);
 
     @PutMapping(value = "/{paymentId}/authorisations/{authorisationId}/authCode")
-    @ApiOperation(value = "Send an authentication code for validation", notes = "Validate an authetication code and returns the cosent token", authorizations = @Authorization(value = "apiKey"))
+    @ApiOperation(value = "Send an authentication code for validation", notes = "Validate an authentication code and returns the consent token", authorizations = @Authorization(value = "apiKey"))
     ResponseEntity<SCAPaymentResponseTO> authorizePayment(@PathVariable("paymentId") String paymentId,
                                                           @PathVariable("authorisationId") String authorisationId,
                                                           @RequestParam(name = "authCode") String authCode);
 
     // =======
     @PostMapping(value = "/{paymentId}/cancellation-authorisations")
-    @ApiOperation(value = "Initiates a Payment Cancelation", notes = "Initiates a Payment Cancelation", authorizations = @Authorization(value = "apiKey"))
+    @ApiOperation(value = "Initiates a Payment Cancellation", notes = "Initiates a Payment Cancellation", authorizations = @Authorization(value = "apiKey"))
     ResponseEntity<SCAPaymentResponseTO> initiatePmtCancellation(@PathVariable("paymentId") String paymentId);
 
     @GetMapping(value = "/{paymentId}/cancellation-authorisations/{cancellationId}")
@@ -85,7 +103,7 @@ public interface PaymentRestAPI {
                                                                       @PathVariable("scaMethodId") String scaMethodId);
 
     @PutMapping(value = "/{paymentId}/cancellation-authorisations/{cancellationId}/authCode")
-    @ApiOperation(value = "Send an authentication code for validation", notes = "Validate an authetication code and returns the cosent token", authorizations = @Authorization(value = "apiKey"))
+    @ApiOperation(value = "Send an authentication code for validation", notes = "Validate an authentication code and returns the consent token", authorizations = @Authorization(value = "apiKey"))
     ResponseEntity<SCAPaymentResponseTO> authorizeCancelPayment(@PathVariable("paymentId") String paymentId,
                                                                 @PathVariable("cancellationId") String cancellationId,
                                                                 @RequestParam(name = "authCode") String authCode);

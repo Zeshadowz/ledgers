@@ -19,12 +19,11 @@ package de.adorsys.ledgers.um.api.domain;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Getter
 @Setter
@@ -39,6 +38,8 @@ public class UserBO {
     private List<AccountAccessBO> accountAccesses = new ArrayList<>();
     private Collection<UserRoleBO> userRoles = new ArrayList<>();
     private String branch;
+    private boolean blocked;
+    private boolean systemBlocked;
 
     public UserBO(@NotNull String login,
                   @NotNull String email,
@@ -64,12 +65,14 @@ public class UserBO {
                        Objects.equals(getScaUserData(), userBO.getScaUserData()) &&
                        Objects.equals(getAccountAccesses(), userBO.getAccountAccesses()) &&
                        Objects.equals(getUserRoles(), userBO.getUserRoles()) &&
-                       Objects.equals(getBranch(), userBO.getBranch());
+                       Objects.equals(getBranch(), userBO.getBranch()) &&
+                       Objects.equals(isBlocked(), userBO.isBlocked()) &&
+                       Objects.equals(isSystemBlocked(), userBO.isSystemBlocked());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getId(), getLogin(), getEmail(), getPin(), getScaUserData(), getAccountAccesses(), getUserRoles(), getBranch());
+        return Objects.hash(getId(), getLogin(), getEmail(), getPin(), getScaUserData(), getAccountAccesses(), getUserRoles(), getBranch(), isBlocked(), isSystemBlocked());
     }
 
     @Override
@@ -83,6 +86,26 @@ public class UserBO {
                        ", accountAccesses=" + accountAccesses +
                        ", userRoles=" + userRoles +
                        ", branch='" + branch + '\'' +
+                       ", blocked='" + blocked + '\'' +
+                       ", systemBlocked='" + systemBlocked + '\'' +
                        '}';
+    }
+
+    public boolean isEnabled() {
+        return !isBlocked() && !isSystemBlocked();
+    }
+
+    public boolean hasAccessToAccount(String iban) {
+        return accountAccesses.stream()
+                       .anyMatch(a -> StringUtils.equalsIgnoreCase(a.getIban(), iban));
+    }
+
+    public boolean hasAccessToAccount(String iban, Currency currency) {
+        return accountAccesses.stream()
+                       .anyMatch(a -> StringUtils.equalsIgnoreCase(a.getIban(), iban) && a.getCurrency().equals(currency));
+    }
+
+    public boolean hasSCA() {
+        return CollectionUtils.isNotEmpty(this.scaUserData);
     }
 }

@@ -3,6 +3,7 @@ package de.adorsys.ledgers.deposit.db.domain;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
 import lombok.Data;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.convert.threeten.Jsr310JpaConverters.LocalDateConverter;
 
@@ -48,6 +49,8 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentType paymentType;
+
+    private String paymentProduct;
 
     /**
      * Represents the starting date for Periodic payments
@@ -102,6 +105,10 @@ public class Payment {
     @Column(nullable = false)
     private AccountReference debtorAccount;
 
+    private String debtorName;
+
+    private String debtorAgent;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransactionStatus transactionStatus;
@@ -109,17 +116,36 @@ public class Payment {
     @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.ALL})
     private List<PaymentTarget> targets = new ArrayList<>();
 
+    @Column(nullable = false)
+    private String accountId;
 
-    //Additional PaymentRelated Logic
-    public boolean isInstant() {
-        return getTargets().stream()
-                       .findFirst()
-                       .map(t -> t.getPaymentProduct() == PaymentProduct.INSTANT_SEPA
-                                         || t.getPaymentProduct() == PaymentProduct.TARGET2)
-                       .orElse(false);
+    @Column
+    @UpdateTimestamp
+    private LocalDateTime updated;
+
+    @Transient
+    private TransactionStatus previousTransactionStatus;
+
+    public boolean isLastExecuted(LocalDate nextPossibleExecutionDate) {
+        return endDate != null && nextPossibleExecutionDate.isAfter(endDate);
     }
 
-    public boolean isLastExecuted(LocalDate nextPossibleExecutionDate){
-        return endDate != null && nextPossibleExecutionDate.isAfter(endDate);
+    @PostLoad
+    public void paymentPostLoad() {
+        previousTransactionStatus = transactionStatus;
+    }
+
+    @PreUpdate
+    public void paymentPreUpdate() {
+        if (previousTransactionStatus != transactionStatus) {
+            updated = LocalDateTime.now();
+        }
+    }
+
+    @PrePersist
+    public void paymentPrePersist() {
+        if (updated == null) {
+            updated = LocalDateTime.now();
+        }
     }
 }
